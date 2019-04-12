@@ -18,8 +18,9 @@ public class ServerMain implements FileSystemObserver {
 	}
 
 	@Override
-	public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
-		// TODO: process events
+	public FileSystemEvent processFileSystemEvent(FileSystemEvent fileSystemEvent) {
+		return fileSystemEvent;
+		
 	}
 	
 }
