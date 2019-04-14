@@ -10,10 +10,18 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
 import org.omg.CORBA.portable.OutputStream;
+
+import unimelb.bitbox.util.Document;
 
 public class ServerConnection implements Runnable {
 
@@ -22,51 +30,88 @@ public class ServerConnection implements Runnable {
 	Socket clientSocket = null;
 	Socket socket = null;
 	ServerConnection serverconnection;
+	Messages json = new Messages();
 
-	public ServerConnection(String port) throws IOException {
+	HashMap<String, Long> connectedPeers = new HashMap();
+	HashMap<String, Long> peersPool = new HashMap();
+	
+	int port;
+	int maximumIncommingConnections;
+	String advertisedHost;
 
-		listeningSocket = new ServerSocket(Integer.parseInt(port));
+	static Queue<String> eventsQ = new LinkedList<>();
+	
+	public ServerConnection(String advertisedHost, int port, int maximumIncommingConnections) throws IOException {
+		this.port = port;
+		this.advertisedHost = advertisedHost;
+		this.maximumIncommingConnections = maximumIncommingConnections;
+		
+		listeningSocket = new ServerSocket(this.port);
 		log.info("Server listening on port " + port + " for a connection");
 	}
 
+	// Thread constructor to pass object to Thread
 	public ServerConnection(ServerConnection serverConnection)  {
 		this.serverconnection = serverConnection;
 		this.listeningSocket = serverConnection.getListeningSocket();
+		this.port = serverConnection.getPort();
+		this.maximumIncommingConnections = serverConnection.getMaximumIncomingConnections();
+		this.advertisedHost = serverConnection.getAdvertisedName();
+	}
+
+	private int getMaximumIncomingConnections() {
+		 
+		return this.maximumIncommingConnections;
+	}
+
+	private String getAdvertisedName() {
+		return this.advertisedHost;
+	}
+
+	private int getPort() {
+		return this.port;
 	}
 
 	private ServerSocket getListeningSocket() {
 		return this.listeningSocket;
 	}
 
-	public void connect() {
+	public void connect(String host, String port) throws InterruptedException {
 		try {
-
 			// Create a stream socket bounded to any port and connect it to the
-			// socket bound to localhost on port xxxx
-			socket = new Socket("43.240.97.106", 3000);
+			// socket bound to advertisedName on serverPort
+			socket = new Socket(host, Integer.parseInt(port));
 			// Get the input/output streams for reading/writing data from/to the socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
 			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
 
-			Messages json = new Messages();
-			
-			out.write(json.getHandshakeRequest("dimefox.eng.unimelb.edu.au", 8111));
+			String handShake = json.getHandshakeRequest(host, Integer.parseInt(port));
+
+			//Send JSON string to server.
+			out.write(handShake + "\n");
 			out.flush();
-				
+			//Thread.sleep(1000);
+			String received;
+			// Receive the reply from the server by reading from the socket input stream
+			//while (in.ready()) {
+			  received = in.readLine(); // This method blocks until there
+			  Document json = proocessJSONstring(received);
+				handleJsonServerMsg(json, out);
+				System.out.println("INCOMING: " + received);
+			//}
+			//System.out.println(received);
+			
 
-				// Receive the reply from the server by reading from the socket input stream
-				String received = in.readLine(); // This method blocks until there
-				// is something to read from the
-				// input stream
-				System.out.println("Message received: " + received);
-			 
-
-			System.out.println("Connection established");
+			//Debug
+			
 
 
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			 
 			e.printStackTrace();
 		} finally {
 			// Close the socket
@@ -78,75 +123,208 @@ public class ServerConnection implements Runnable {
 				}
 			}
 		}
+
 	}
 
+	private void handleJsonServerMsg(Document json, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+		String command = json.getString("command");
+		String invalidProtocol;
+
+		switch (command){
+
+		case "HANDSHAKE_RESPONSE":
+			Document hostPort = (Document) json.get("hostPort");
+			Long port =  hostPort.getLong("port");
+			String host = hostPort.getString("host");
 
 
-
-
-
-	@Override
-	public void run() {
-		while(true) {
-			//Connection Management Thread
-			Socket clientSocket = null;
-
-			try {
-				//Create a server socket listening on port 4444
-
-				int i = 0; //counter to keep track of the number of clients
-
-
-				//Listen for incoming connections for ever 
-				while (true) {
-
-					//Accept an incoming client connection request 
-					clientSocket = listeningSocket.accept(); //This method will block until a connection request is received
-					i++;
-				//	System.out.println("Client conection number " + i + " accepted:");
-				//	System.out.println("Remote Port: " + clientSocket.getPort());
-				//	System.out.println("Remote Hostname: " + clientSocket.getInetAddress().getHostName());
-				//	System.out.println("Local Port: " + clientSocket.getLocalPort());
-
-					//Get the input/output streams for reading/writing data from/to the socket
-					BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
-					BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
-
-
-					//Read the message from the client and reply
-					//Notice that no other connection can be accepted and processed until the last line of 
-					//code of this loop is executed, incoming connections have to wait until the current
-					//one is processed unless...we use threads!
-					String clientMsg = null;
-					try {
-						while((clientMsg = in.readLine()) != null) {
-							System.out.println("Message from client " + i + ": " + clientMsg);
-							out.write("Server Ack " + clientMsg + "\n");
-							out.flush();
-							System.out.println("Response sent");
-						}}
-					catch(SocketException e) {
-						System.out.println("closed...");
-					}
-					clientSocket.close();
+			// Check message credibility, ensure host field
+			if (host != null && port != null) {
+				//Proofing if a peer accepted an existing connection
+				if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
+					invalidProtocol= this.json.getInvalidProtocol("Peer already connected!");
+					out.write(invalidProtocol+"\n");
+					out.flush();
 				}
-			} catch (SocketException ex) {
-				ex.printStackTrace();
-			}catch (IOException e) {
-				e.printStackTrace();
-			} 
-			finally {
-				if(listeningSocket != null) {
-					try {
-						listeningSocket.close();
-					} catch (IOException e) {
-						e.printStackTrace();
+				else {
+					connectedPeers.put(host,port);
+					log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
+					// Start peer thread
+					Runnable runnable = new ServerMain(new ServerMain(host,port));
+					Thread thread = new Thread(runnable);
+					thread.start();
+					log.info("P2P Connection Thread Running");
+				}					
+			}else {
+				invalidProtocol = this.json.getInvalidProtocol("message must contain hostPort field");
+				out.write(invalidProtocol+"\n");
+				out.flush();
+			}
+			break;
+
+		case "CONNECTION_REFUSED":
+			ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
+			for (Document peer : peers) {
+				port =  peer.getLong("port");
+				host =  peer.getString("host");
+				if (host != null && port != null) {
+					if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
+						// Do not add to connection pool if already connected to that peer
 					}
+					else {
+						peersPool.put(host,port);
+						// Connect if connections less than 10
+					}		
+				}else {
+					invalidProtocol = this.json.getInvalidProtocol("message must contain hostPort field");
+					
+					out.write(invalidProtocol+"\n");
+					out.flush();
 				}
 			}
+
+			break;
+		default:
+			invalidProtocol = this.json.getInvalidProtocol("Expected HANDSHAKE_RESPONSE");
+			 out.write(invalidProtocol+"\n");
+			 out.flush();
+
+		}
+
+	}
+	
+	private void handleJsonClientMsg(Document json, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+		String command = json.getString("command");
+		String invalidProtocol;
+		
+		Document hostPort = (Document) json.get("hostPort");
+		Long port =  hostPort.getLong("port");
+		String host = hostPort.getString("host");
+		switch (command){
+
+		case "HANDSHAKE_REQUEST":
+			
+			// Check message credibility, ensure host field
+			if (host != null && port != null) {
+				//Proofing if a peer accepted an existing connection
+				if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
+					invalidProtocol= this.json.getInvalidProtocol("Peer already connected!");
+					log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+					out.write(invalidProtocol+"\n");
+					out.flush();
+				}
+				else if (connectedPeers.size() >= this.maximumIncommingConnections){
+					String connectionRefused = this.json.getConnectionRefused(connectedPeers, "connection limit reached");
+					log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + connectionRefused);
+					out.write(connectionRefused + "\n");
+					out.flush();
+				}else {
+					connectedPeers.put(host,port);
+					log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
+					/* Debug
+					System.out.println("Client conection number " + i + " accepted:");
+					System.out.println("Remote Port: " + clientSocket.getPort());
+					System.out.println("Remote Hostname: " + clientSocket.getInetAddress().getHostName());
+					System.out.println("Local Port: " + clientSocket.getLocalPort());
+					// End Debug
+					*/
+					String handShakeResponse = this.json.getHandshakeResponse(advertisedHost, port);
+					out.write(handShakeResponse+"\n");
+					out.flush();
+					// Start peer thread to manage P2P communication in seperate thread per peer
+					
+					Runnable runnable = new ServerMain(new ServerMain(host,port));
+					Thread thread = new Thread(runnable);
+					thread.start();
+					log.info("P2P Connection Thread Running");
+				}
+			}else {
+				invalidProtocol = this.json.getInvalidProtocol("message must contain hostPort field");
+				log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+				out.write(invalidProtocol+"\n");
+				out.flush();
+			}
+			break;
+
+		
+		default:
+			invalidProtocol = this.json.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
+			log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+			out.write(invalidProtocol+"\n");
+			out.flush();
+
 		}
 
 	}
 
+
+	private Document proocessJSONstring(String jsonMessage) {
+		Document json = new Document();
+		json = Document.parse(jsonMessage);
+		return json;
+	}
+
+	@Override
+	public void run() {
+
+		//Connection Management Thread
+		Socket clientSocket = null;
+
+		try {
+			//Create a server socket listening on port 4444
+			//Get the input/output streams for reading/writing data from/to the socket
+
+			int i = 0; //counter to keep track of the number of clients
+
+
+			//Listen for incoming connections for ever 
+			while (true) {
+
+				//Accept an incoming client connection request 
+				clientSocket = listeningSocket.accept(); //This method will block until a connection request is received
+				BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+				BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+
+
+				String clientHost = clientSocket.getInetAddress().getHostName();
+				Long clientPort = (long) clientSocket.getLocalPort();
+
+				i++;
+				String clientMsg = null;
+				try {
+					while((clientMsg = in.readLine()) != null) {  
+					 System.out.println("INCOMING " + i + ": " + clientMsg);
+					// break;
+					 }}
+			
+				catch(SocketException e) {
+					System.out.println("closed...");
+				}
+				//clientSocket.close();
+				Document json1 = proocessJSONstring(clientMsg);
+				try {
+					handleJsonClientMsg(json1, out);
+				} catch (NoSuchAlgorithmException e) {
+					 
+					e.printStackTrace();
+				}
+				
+
+			}
+		} catch (SocketException ex) {
+			ex.printStackTrace();
+		}catch (IOException e) {
+			e.printStackTrace();
+		} 
+		finally {
+			if(listeningSocket != null) {
+				try {
+					listeningSocket.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 
 }

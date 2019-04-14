@@ -33,13 +33,24 @@ public class Messages {
         return doc2.toJson();
 	}
 	
-	public String getConnectionRefused(HashMap<String,String> peers) {
+	public String getHandshakeResponse(String host, Long port) {
+		Document doc1 = new Document();
+        doc1.append("host",host);
+        doc1.append("port",port);
+        Document doc2 = new Document();
+        doc2.append("hostPort",doc1);
+        doc2.append("command","HANDSHAKE_RESPONSE");
+        
+        return doc2.toJson();
+	}
+	
+	public String getConnectionRefused(HashMap<String,Long> peers, String message) {
 		ArrayList<Document> docs = new ArrayList<Document>();
 		Document doc1 = new Document();
 		
-		for (HashMap.Entry<String, String> entry : peers.entrySet()) {
-		    String port = entry.getKey();
-		    String host = entry.getValue();
+		for (HashMap.Entry<String, Long> entry : peers.entrySet()) {
+		    Long port = entry.getValue();
+		    String host = entry.getKey();
 		    doc1.append("host",host);
 	        doc1.append("port",port);
 	        docs.add(doc1);
@@ -49,7 +60,7 @@ public class Messages {
 		doc2.append("peers",docs);
         
         doc2.append("command","CONNECTION_REFUSED");
-        doc2.append("message","connection limit reached");
+        doc2.append("message",message);
         
         return doc2.toJson();
 	}
