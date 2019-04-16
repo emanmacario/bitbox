@@ -21,7 +21,9 @@ import java.util.logging.Logger;
 
 import org.omg.CORBA.portable.OutputStream;
 
+import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.FileSystemManager;
 
 public class ServerConnection implements Runnable {
 
@@ -38,13 +40,15 @@ public class ServerConnection implements Runnable {
 	int port;
 	int maximumIncommingConnections;
 	String advertisedHost;
-
-	static Queue<String> eventsQ = new LinkedList<>();
+	private FileSystemManager fileSystemManager;
+	private ServerMain serverMain;
+ 
 	
-	public ServerConnection(String advertisedHost, int port, int maximumIncommingConnections) throws IOException {
+	public ServerConnection(String advertisedHost, int port, int maximumIncommingConnections, ServerMain serverMain) throws IOException {
 		this.port = port;
 		this.advertisedHost = advertisedHost;
 		this.maximumIncommingConnections = maximumIncommingConnections;
+		this.serverMain = serverMain;
 		
 		listeningSocket = new ServerSocket(this.port);
 		log.info("Server listening on port " + port + " for a connection");
@@ -80,7 +84,7 @@ public class ServerConnection implements Runnable {
 		try {
 			// Create a stream socket bounded to any port and connect it to the
 			// socket bound to advertisedName on serverPort
-			socket = new Socket(host, Integer.parseInt(port));
+			socket = new Socket(host, (int) Long.parseLong(port));
 			// Get the input/output streams for reading/writing data from/to the socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
 			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
@@ -96,7 +100,7 @@ public class ServerConnection implements Runnable {
 			//while (in.ready()) {
 			  received = in.readLine(); // This method blocks until there
 			  Document json = proocessJSONstring(received);
-				handleJsonServerMsg(json, out);
+				handleJsonServerMsg(json, socket, in,  out);
 				System.out.println("INCOMING: " + received);
 			//}
 			//System.out.println(received);
@@ -126,7 +130,7 @@ public class ServerConnection implements Runnable {
 
 	}
 
-	private void handleJsonServerMsg(Document json, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+	private void handleJsonServerMsg(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
 		String command = json.getString("command");
 		String invalidProtocol;
 
@@ -150,7 +154,7 @@ public class ServerConnection implements Runnable {
 					connectedPeers.put(host,port);
 					log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
 					// Start peer thread
-					Runnable runnable = new ServerMain(new ServerMain(host,port));
+					Runnable runnable = new ServerMain( serverMain,  socket,  in,  out);
 					Thread thread = new Thread(runnable);
 					thread.start();
 					log.info("P2P Connection Thread Running");
@@ -193,7 +197,7 @@ public class ServerConnection implements Runnable {
 
 	}
 	
-	private void handleJsonClientMsg(Document json, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+	private void handleJsonClientMsg(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
 		String command = json.getString("command");
 		String invalidProtocol;
 		
@@ -233,7 +237,7 @@ public class ServerConnection implements Runnable {
 					out.flush();
 					// Start peer thread to manage P2P communication in seperate thread per peer
 					
-					Runnable runnable = new ServerMain(new ServerMain(host,port));
+					Runnable runnable = new ServerMain(serverMain, clientSocket, in, out);
 					Thread thread = new Thread(runnable);
 					thread.start();
 					log.info("P2P Connection Thread Running");
@@ -301,9 +305,9 @@ public class ServerConnection implements Runnable {
 					System.out.println("closed...");
 				}
 				//clientSocket.close();
-				Document json1 = proocessJSONstring(clientMsg);
+				Document json = proocessJSONstring(clientMsg);
 				try {
-					handleJsonClientMsg(json1, out);
+					handleJsonClientMsg(json, clientSocket, in, out);
 				} catch (NoSuchAlgorithmException e) {
 					 
 					e.printStackTrace();

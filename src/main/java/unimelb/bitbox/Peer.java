@@ -34,7 +34,8 @@ public class Peer
 		String advertisedName = Configuration.getConfigurationValue("advertisedName");
 		int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
 		int maximumIncommingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
-		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumIncommingConnections);
+		ServerMain serverMain = new ServerMain();
+		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumIncommingConnections, serverMain);
 		
 		//Start Server Thread to accept incoming connections
 		Runnable runnable = new ServerConnection(serverConnection);
@@ -70,6 +71,7 @@ public class Peer
 		
 		//Get peers string from properties and process peers in an Array
 		//Splitting and Comma, and removing white spaces
+		
 		String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
 
 		//Create HasMap<Peer,<host,port>>
@@ -100,8 +102,8 @@ public class Peer
 				String port = hostPortMapEntry.getValue();
 
 				serverConnection.connect(host,port);
-				Thread.sleep(3000);
-				System.out.println(10000);
+				Thread.sleep(1000);
+				//System.out.println(value);
 			}
 						
 		}
