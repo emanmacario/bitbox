@@ -1,7 +1,7 @@
 package unimelb.bitbox;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.Iterator;
 
 import org.json.simple.JSONObject;
@@ -45,9 +45,9 @@ public class Messages {
         return doc2.toJson();
 	}
 	
-	public String getConnectionRefused(HashMap<String,Integer> peers, String message) {
+	public String getConnectionRefused(Map<String,Integer> peers, String message) {
 		ArrayList<Document> peerList = new ArrayList<Document>();
-		for (HashMap.Entry<String, Integer> entry : peers.entrySet()) {
+		for (Map.Entry<String, Integer> entry : peers.entrySet()) {
             String host = entry.getKey();
 		    Integer port = entry.getValue();
 		    peerList.add(new HostPort(host, port).toDoc());

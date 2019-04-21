@@ -34,20 +34,20 @@ public class ServerConnection implements Runnable {
 	ServerConnection serverconnection;
 	Messages json = new Messages();
 
-	HashMap<String, Integer> connectedPeers = new HashMap();
-	HashMap<String, Integer> peersPool = new HashMap();
+	Map<String, Integer> connectedPeers = new HashMap<>();
+	Map<String, Integer> peersPool = new HashMap<>();
 	
 	int port;
-	int maximumIncommingConnections;
+	int maximumincomingConnections;
 	String advertisedHost;
 	private FileSystemManager fileSystemManager;
 	private ServerMain serverMain;
  
 	
-	public ServerConnection(String advertisedHost, int port, int maximumIncommingConnections, ServerMain serverMain) throws IOException {
+	public ServerConnection(String advertisedHost, int port, int maximumincomingConnections, ServerMain serverMain) throws IOException {
 		this.port = port;
 		this.advertisedHost = advertisedHost;
-		this.maximumIncommingConnections = maximumIncommingConnections;
+		this.maximumincomingConnections = maximumincomingConnections;
 		this.serverMain = serverMain;
 		
 		listeningSocket = new ServerSocket(this.port);
@@ -59,13 +59,13 @@ public class ServerConnection implements Runnable {
 		this.serverconnection = serverConnection;
 		this.listeningSocket = serverConnection.getListeningSocket();
 		this.port = serverConnection.getPort();
-		this.maximumIncommingConnections = serverConnection.getMaximumIncomingConnections();
+		this.maximumincomingConnections = serverConnection.getMaximumIncomingConnections();
 		this.advertisedHost = serverConnection.getAdvertisedName();
 	}
 
 	private int getMaximumIncomingConnections() {
 		 
-		return this.maximumIncommingConnections;
+		return this.maximumincomingConnections;
 	}
 
 	private String getAdvertisedName() {
@@ -97,25 +97,15 @@ public class ServerConnection implements Runnable {
 			//Thread.sleep(1000);
 			String received;
 			// Receive the reply from the server by reading from the socket input stream
-			//while (in.ready()) {
 			received = in.readLine(); // This method blocks until there
-			Document json = proocessJSONstring(received);
+			Document json = processJSONstring(received);
 			handleJsonServerMsg(json, socket, in,  out);
 			System.out.println("INCOMING: " + received);
-			//}
-			//System.out.println(received);
-			
-
-			//Debug
-			
-
-
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
-			 
 			e.printStackTrace();
 		} finally {
 			// Close the socket
@@ -127,29 +117,21 @@ public class ServerConnection implements Runnable {
 				}
 			}
 		}
-
 	}
 
 	private void handleJsonServerMsg(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
 		String command = json.getString("command");
 		String invalidProtocol;
 
-		switch (command){
+		switch (command) {
 
 		case "HANDSHAKE_RESPONSE":
-			System.out.println("=== PROCESSING HANDSHAKE RESPONE ===");
 			Document hostPort = (Document) json.get("hostPort");
-
-
-			System.out.println("Getting int port");
 			Integer port =  (int) hostPort.getLong("port");
-			System.out.println("Got int port");
-
 			String host = hostPort.getString("host");
 
-
 			// Check message credibility, ensure host field
-			if (host != null && port != null) {
+			if (port != null && host != null) {
 				//Proofing if a peer accepted an existing connection
 				if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
 					invalidProtocol= this.json.getInvalidProtocol("Peer already connected!");
@@ -165,7 +147,7 @@ public class ServerConnection implements Runnable {
 					thread.start();
 					log.info("P2P Connection Thread Running");
 				}					
-			}else {
+			} else {
 				invalidProtocol = this.json.getInvalidProtocol("message must contain hostPort field");
 				out.write(invalidProtocol+"\n");
 				out.flush();
@@ -175,8 +157,8 @@ public class ServerConnection implements Runnable {
 		case "CONNECTION_REFUSED":
 			ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
 			for (Document peer : peers) {
-				port =  peer.getInteger("port");
-				host =  peer.getString("host");
+				port = peer.getInteger("port");
+				host = peer.getString("host");
 				if (host != null && port != null) {
 					if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
 						// Do not add to connection pool if already connected to that peer
@@ -192,15 +174,12 @@ public class ServerConnection implements Runnable {
 					out.flush();
 				}
 			}
-
 			break;
 		default:
 			invalidProtocol = this.json.getInvalidProtocol("Expected HANDSHAKE_RESPONSE");
 			 out.write(invalidProtocol+"\n");
 			 out.flush();
-
 		}
-
 	}
 	
 	private void handleJsonClientMsg(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
@@ -213,7 +192,6 @@ public class ServerConnection implements Runnable {
 		switch (command){
 
 		case "HANDSHAKE_REQUEST":
-			
 			// Check message credibility, ensure host field
 			if (host != null && port != null) {
 				//Proofing if a peer accepted an existing connection
@@ -223,12 +201,12 @@ public class ServerConnection implements Runnable {
 					out.write(invalidProtocol+"\n");
 					out.flush();
 				}
-				else if (connectedPeers.size() >= this.maximumIncommingConnections){
+				else if (connectedPeers.size() >= this.maximumincomingConnections){
 					String connectionRefused = this.json.getConnectionRefused(connectedPeers, "connection limit reached");
 					log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + connectionRefused);
 					out.write(connectionRefused + "\n");
 					out.flush();
-				}else {
+				} else {
 					connectedPeers.put(host,port);
 					log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
 					/* Debug
@@ -248,7 +226,7 @@ public class ServerConnection implements Runnable {
 					thread.start();
 					log.info("P2P Connection Thread Running");
 				}
-			}else {
+			} else {
 				invalidProtocol = this.json.getInvalidProtocol("message must contain hostPort field");
 				log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
 				out.write(invalidProtocol+"\n");
@@ -256,19 +234,16 @@ public class ServerConnection implements Runnable {
 			}
 			break;
 
-		
 		default:
 			invalidProtocol = this.json.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
 			log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
 			out.write(invalidProtocol+"\n");
 			out.flush();
-
 		}
-
 	}
 
 
-	private Document proocessJSONstring(String jsonMessage) {
+	private Document processJSONstring(String jsonMessage) {
 		Document json = new Document();
 		json = Document.parse(jsonMessage);
 		return json;
@@ -302,30 +277,30 @@ public class ServerConnection implements Runnable {
 				i++;
 				String clientMsg = null;
 				try {
-					while((clientMsg = in.readLine()) != null) {  
+					while((clientMsg = in.readLine()) != null) {
 					 System.out.println("INCOMING " + i + ": " + clientMsg);
 					// break;
 					 }}
-			
+
 				catch(SocketException e) {
 					System.out.println("closed...");
 				}
 				//clientSocket.close();
-				Document json = proocessJSONstring(clientMsg);
+				Document json = processJSONstring(clientMsg);
 				try {
 					handleJsonClientMsg(json, clientSocket, in, out);
 				} catch (NoSuchAlgorithmException e) {
-					 
+
 					e.printStackTrace();
 				}
-				
+
 
 			}
 		} catch (SocketException ex) {
 			ex.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
-		} 
+		}
 		finally {
 			if(listeningSocket != null) {
 				try {

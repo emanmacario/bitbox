@@ -1,13 +1,9 @@
 package unimelb.bitbox;
 
-import java.awt.List;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -33,9 +29,9 @@ public class Peer
 		//Server Setup, get Port and Advertised name from properties
 		String advertisedName = Configuration.getConfigurationValue("advertisedName");
 		int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
-		int maximumIncommingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
+		int maximumincomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumincomingConnections"));
 		ServerMain serverMain = new ServerMain();
-		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumIncommingConnections, serverMain);
+		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumincomingConnections, serverMain);
 		
 		//Start Server Thread to accept incoming connections
 		Runnable runnable = new ServerConnection(serverConnection);
@@ -74,6 +70,9 @@ public class Peer
 		//Splitting and Comma, and removing white spaces
 		String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
 
+
+		// List<Document> peersList = new ArrayList<>();
+
 		//Create HasMap<Peer,<host,port>>
 		HashMap<String,HashMap<String,String>> peersMap = new HashMap<String, HashMap<String, String>>();
 		HashMap<String,String> hostPort = new HashMap<String,String>();
@@ -81,12 +80,12 @@ public class Peer
 		//Peer index
 		int peerIndex = 0;
 
-		// Iterate over Oeers in Peers Array, and split at : to get Port and Host, and add each to peersMap
+		// Iterate over peers in Peers Array, and split at : to get Port and Host, and add each to peersMap
 		for (String peer: peersArray) {
 			peerIndex++;
-			String[] peerHostPort = peer.split(":"); 
-			String host = peerHostPort[0];  
-			String port = peerHostPort[1];  
+			String[] peerHostPort = peer.split(":");
+			String host = peerHostPort[0];
+			String port = peerHostPort[1];
 			hostPort.put(host,port);
 			peersMap.put("Peer" + peerIndex, new HashMap<>(hostPort));
 			hostPort.clear();
