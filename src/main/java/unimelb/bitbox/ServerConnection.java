@@ -34,8 +34,8 @@ public class ServerConnection implements Runnable {
 	ServerConnection serverconnection;
 	Messages json = new Messages();
 
-	HashMap<String, Long> connectedPeers = new HashMap();
-	HashMap<String, Long> peersPool = new HashMap();
+	HashMap<String, Integer> connectedPeers = new HashMap();
+	HashMap<String, Integer> peersPool = new HashMap();
 	
 	int port;
 	int maximumIncommingConnections;
@@ -84,7 +84,7 @@ public class ServerConnection implements Runnable {
 		try {
 			// Create a stream socket bounded to any port and connect it to the
 			// socket bound to advertisedName on serverPort
-			socket = new Socket(host, (int) Long.parseLong(port));
+			socket = new Socket(host, Integer.parseInt(port));
 			// Get the input/output streams for reading/writing data from/to the socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
 			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
@@ -98,10 +98,10 @@ public class ServerConnection implements Runnable {
 			String received;
 			// Receive the reply from the server by reading from the socket input stream
 			//while (in.ready()) {
-			  received = in.readLine(); // This method blocks until there
-			  Document json = proocessJSONstring(received);
-				handleJsonServerMsg(json, socket, in,  out);
-				System.out.println("INCOMING: " + received);
+			received = in.readLine(); // This method blocks until there
+			Document json = proocessJSONstring(received);
+			handleJsonServerMsg(json, socket, in,  out);
+			System.out.println("INCOMING: " + received);
 			//}
 			//System.out.println(received);
 			
@@ -137,8 +137,14 @@ public class ServerConnection implements Runnable {
 		switch (command){
 
 		case "HANDSHAKE_RESPONSE":
+			System.out.println("=== PROCESSING HANDSHAKE RESPONE ===");
 			Document hostPort = (Document) json.get("hostPort");
-			Long port =  hostPort.getLong("port");
+
+
+			System.out.println("Getting int port");
+			Integer port =  (int) hostPort.getLong("port");
+			System.out.println("Got int port");
+
 			String host = hostPort.getString("host");
 
 
@@ -169,7 +175,7 @@ public class ServerConnection implements Runnable {
 		case "CONNECTION_REFUSED":
 			ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
 			for (Document peer : peers) {
-				port =  peer.getLong("port");
+				port =  peer.getInteger("port");
 				host =  peer.getString("host");
 				if (host != null && port != null) {
 					if (connectedPeers.containsKey(host) && connectedPeers.get(host).equals(port)){
@@ -202,7 +208,7 @@ public class ServerConnection implements Runnable {
 		String invalidProtocol;
 		
 		Document hostPort = (Document) json.get("hostPort");
-		Long port =  hostPort.getLong("port");
+		Integer port =  hostPort.getInteger("port");
 		String host = hostPort.getString("host");
 		switch (command){
 
@@ -291,7 +297,7 @@ public class ServerConnection implements Runnable {
 
 
 				String clientHost = clientSocket.getInetAddress().getHostName();
-				Long clientPort = (long) clientSocket.getLocalPort();
+				Integer clientPort = clientSocket.getLocalPort();
 
 				i++;
 				String clientMsg = null;
@@ -317,7 +323,7 @@ public class ServerConnection implements Runnable {
 			}
 		} catch (SocketException ex) {
 			ex.printStackTrace();
-		}catch (IOException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		} 
 		finally {

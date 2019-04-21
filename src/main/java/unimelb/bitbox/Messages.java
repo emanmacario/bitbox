@@ -7,11 +7,12 @@ import java.util.Iterator;
 import org.json.simple.JSONObject;
 
 import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.HostPort;
 
 public class Messages {
+
 	public Messages() {
-		
-        
+
 	}
 	
 	public String getInvalidProtocol(String message) {
@@ -33,7 +34,7 @@ public class Messages {
         return doc2.toJson();
 	}
 	
-	public String getHandshakeResponse(String host, Long port) {
+	public String getHandshakeResponse(String host, int port) {
 		Document doc1 = new Document();
         doc1.append("host",host);
         doc1.append("port",port);
@@ -44,25 +45,22 @@ public class Messages {
         return doc2.toJson();
 	}
 	
-	public String getConnectionRefused(HashMap<String,Long> peers, String message) {
-		ArrayList<Document> docs = new ArrayList<Document>();
-		Document doc1 = new Document();
-		
-		for (HashMap.Entry<String, Long> entry : peers.entrySet()) {
-		    Long port = entry.getValue();
-		    String host = entry.getKey();
-		    doc1.append("host",host);
-	        doc1.append("port",port);
-	        docs.add(doc1);
+	public String getConnectionRefused(HashMap<String,Integer> peers, String message) {
+		ArrayList<Document> peerList = new ArrayList<Document>();
+		for (HashMap.Entry<String, Integer> entry : peers.entrySet()) {
+            String host = entry.getKey();
+		    Integer port = entry.getValue();
+		    peerList.add(new HostPort(host, port).toDoc());
 		}
+
+		System.out.println("Size of peerlist:" + peerList.size());
 	    
-		Document doc2 = new Document();
-		doc2.append("peers",docs);
+		Document doc = new Document();
+		doc.append("peers", peerList);
+        doc.append("command","CONNECTION_REFUSED");
+        doc.append("message",message);
         
-        doc2.append("command","CONNECTION_REFUSED");
-        doc2.append("message",message);
-        
-        return doc2.toJson();
+        return doc.toJson();
 	}
 	
 	public String getFileCreateRequest(String md5, Long lastModified, Long fileSize, String pathName) {

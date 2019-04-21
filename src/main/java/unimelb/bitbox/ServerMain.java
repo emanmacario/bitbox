@@ -23,9 +23,9 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	private static Logger log = Logger.getLogger(ServerMain.class.getName());
 	protected FileSystemManager fileSystemManager;
 	private String host;
-	private Long port;
+	private Integer port;
 	private ServerMain serverMain;
-	static HashMap<String, Long> peersConnected = new HashMap();
+	static HashMap<String, Integer> peersConnected = new HashMap<>();
 	
 	boolean isEmpty= true;
 	private Socket clientSocket;

@@ -43,16 +43,16 @@ public class Peer
 		thread.start();
 		log.info("Connection Management Thread Running");
 
-		/* Testing Block
+
+		/*
 		Messages json = new Messages();
 		System.out.println(json.getHandshakeRequest("bigdata.cis.unimelb.edu.au",8121));
-		   
-        HashMap<String, String> peers  = new HashMap<String, String>() {{
-            put("8111", "sunrise.cis.unimelb.edu.au");
-            put("8500", "sunrise.cis.unimelb.edu.au");
-        }};
 
-        System.out.println(json.getConnectionRefused(peers));
+        HashMap<String, Integer> peers  = new HashMap<String, Integer>() {{
+            put("sunrise.cis.unimelb.edu.au", Integer.parseInt("8111"));
+            put("bigdata.cis.unimelb.edu.au", Integer.parseInt("8500"));
+        }};
+        System.out.println(json.getConnectionRefused(peers, "Sorry, connection refused"));
         String md5 = "074195d72c47315efae797b69393e5e5";
         long lastModified = 1553417607;
         long fileSize = 45787;
@@ -61,22 +61,22 @@ public class Peer
         long position = 5; 
         long length = 6; 
         String content = "aGVsbG8K";
-        
+        */
+
+        /*
 		System.out.println(json.getFileCreateRequest(md5, lastModified, fileSize, pathName));
 		System.out.println(json.getFileCreateResponse(md5, lastModified, fileSize, pathName, status));
 		System.out.println(json.getInvalidProtocol());
 		System.out.println(json.getFileBytesRequest(md5, lastModified, fileSize, pathName, position, length));
-		for (int i = 0; i < 10;i++)
-		*/
+         */
 		
 		//Get peers string from properties and process peers in an Array
 		//Splitting and Comma, and removing white spaces
-		
 		String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
 
 		//Create HasMap<Peer,<host,port>>
 		HashMap<String,HashMap<String,String>> peersMap = new HashMap<String, HashMap<String, String>>();
-		HashMap <String,String> hostPort = new HashMap<String,String>();
+		HashMap<String,String> hostPort = new HashMap<String,String>();
 
 		//Peer index
 		int peerIndex = 0;
@@ -88,7 +88,7 @@ public class Peer
 			String host = peerHostPort[0];  
 			String port = peerHostPort[1];  
 			hostPort.put(host,port);
-			peersMap.put("Peer" + peerIndex, new HashMap<String,String>(hostPort));
+			peersMap.put("Peer" + peerIndex, new HashMap<>(hostPort));
 			hostPort.clear();
 		}
 
@@ -107,6 +107,5 @@ public class Peer
 			}
 						
 		}
-
 	}
 }
