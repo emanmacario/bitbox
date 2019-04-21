@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -20,7 +21,6 @@ public class Peer
 
 {
 	private static Logger log = Logger.getLogger(Peer.class.getName());
-
 
 	public static void main( String[] args ) throws IOException, NumberFormatException, NoSuchAlgorithmException, InterruptedException
 	{
@@ -109,5 +109,4 @@ public class Peer
 		}
 
 	}
-
 }

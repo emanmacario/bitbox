@@ -330,5 +330,4 @@ public class ServerConnection implements Runnable {
 			}
 		}
 	}
-
 }

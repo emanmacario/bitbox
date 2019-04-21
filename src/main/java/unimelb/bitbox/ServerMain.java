@@ -121,10 +121,6 @@ public class ServerMain implements FileSystemObserver, Runnable {
 			}
 			
 		}
-		*/
-		
-		
-		
+		*/	
 	}
-	
 }
