@@ -28,63 +28,48 @@ import unimelb.bitbox.util.FileSystemManager;
 public class ServerConnection implements Runnable {
 
 	private static Logger log = Logger.getLogger(Peer.class.getName());
-	ServerSocket listeningSocket = null;
-	Socket clientSocket = null;
-	Socket socket = null;
-	ServerConnection serverconnection;
-	Messages json = new Messages();
 
-	Map<String, Integer> connectedPeers = new HashMap<>();
-	Map<String, Integer> peersPool = new HashMap<>();
-	
-	int port;
-	int maximumincomingConnections;
-	String advertisedHost;
+	private ServerSocket listeningSocket = null;
+	private Socket clientSocket = null;
+	private Socket socket = null;
+	private ServerConnection serverConnection;
+	private Messages json = new Messages();
+	private Map<String, Integer> connectedPeers = new HashMap<>();
+	private Map<String, Integer> peersPool = new HashMap<>();
+	private int port;
+	private int maximumIncomingConnections;
+	private String advertisedHost;
 	private FileSystemManager fileSystemManager;
 	private ServerMain serverMain;
  
 	
-	public ServerConnection(String advertisedHost, int port, int maximumincomingConnections, ServerMain serverMain) throws IOException {
+	public ServerConnection(String advertisedHost, int port, int maximumIncomingConnections, ServerMain serverMain) throws IOException {
 		this.port = port;
 		this.advertisedHost = advertisedHost;
-		this.maximumincomingConnections = maximumincomingConnections;
+		this.maximumIncomingConnections = maximumIncomingConnections;
 		this.serverMain = serverMain;
-		
-		listeningSocket = new ServerSocket(this.port);
+
+		// Bind to the port number on advertisedHost
+		this.listeningSocket = new ServerSocket(this.port);
 		log.info("Server listening on port " + port + " for a connection");
 	}
 
 	// Thread constructor to pass object to Thread
 	public ServerConnection(ServerConnection serverConnection)  {
-		this.serverconnection = serverConnection;
+		this.serverConnection = serverConnection;
 		this.listeningSocket = serverConnection.getListeningSocket();
 		this.port = serverConnection.getPort();
-		this.maximumincomingConnections = serverConnection.getMaximumIncomingConnections();
+		this.maximumIncomingConnections = serverConnection.getMaximumIncomingConnections();
 		this.advertisedHost = serverConnection.getAdvertisedName();
 	}
 
-	private int getMaximumIncomingConnections() {
-		 
-		return this.maximumincomingConnections;
-	}
-
-	private String getAdvertisedName() {
-		return this.advertisedHost;
-	}
-
-	private int getPort() {
-		return this.port;
-	}
-
-	private ServerSocket getListeningSocket() {
-		return this.listeningSocket;
-	}
 
 	public void connect(String host, String port) throws InterruptedException {
 		try {
-			// Create a stream socket bounded to any port and connect it to the
-			// socket bound to advertisedName on serverPort
+			// Create a stream socket bounded to any port and connect
+			// it to the socket bound to advertisedName on serverPort
 			socket = new Socket(host, Integer.parseInt(port));
+
 			// Get the input/output streams for reading/writing data from/to the socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
 			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
@@ -102,9 +87,10 @@ public class ServerConnection implements Runnable {
 			handleJsonServerMsg(json, socket, in,  out);
 			System.out.println("INCOMING: " + received);
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 		} catch (IOException e) {
-			e.printStackTrace();
+			log.warning("while connecting to " + host + ":" + port + "Connection Refused");
+			// e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		} finally {
@@ -187,8 +173,10 @@ public class ServerConnection implements Runnable {
 		String invalidProtocol;
 		
 		Document hostPort = (Document) json.get("hostPort");
-		Integer port =  hostPort.getInteger("port");
+		Integer port =  (int) hostPort.getLong("port");
 		String host = hostPort.getString("host");
+
+		System.out.println("== CHECKING HANDSHAKE REQUEST ==");
 		switch (command){
 
 		case "HANDSHAKE_REQUEST":
@@ -201,7 +189,7 @@ public class ServerConnection implements Runnable {
 					out.write(invalidProtocol+"\n");
 					out.flush();
 				}
-				else if (connectedPeers.size() >= this.maximumincomingConnections){
+				else if (connectedPeers.size() >= this.maximumIncomingConnections){
 					String connectionRefused = this.json.getConnectionRefused(connectedPeers, "connection limit reached");
 					log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + connectionRefused);
 					out.write(connectionRefused + "\n");
@@ -242,7 +230,6 @@ public class ServerConnection implements Runnable {
 		}
 	}
 
-
 	private Document processJSONstring(String jsonMessage) {
 		Document json = new Document();
 		json = Document.parse(jsonMessage);
@@ -277,24 +264,20 @@ public class ServerConnection implements Runnable {
 				i++;
 				String clientMsg = null;
 				try {
-					while((clientMsg = in.readLine()) != null) {
-					 System.out.println("INCOMING " + i + ": " + clientMsg);
-					// break;
-					 }}
 
-				catch(SocketException e) {
-					System.out.println("closed...");
+					clientMsg = in.readLine(); // Blocking receive call
+					System.out.println("NEW MESSAGE RECEIVED: " + clientMsg);
+					Document json = processJSONstring(clientMsg);
+
+					try {
+						System.out.println("Handling new client message...");
+						handleJsonClientMsg(json, clientSocket, in, out);
+					} catch (NoSuchAlgorithmException e) {
+						e.printStackTrace();
+					}
+				} catch(SocketException e) {
+					System.out.println("Client socket has closed");
 				}
-				//clientSocket.close();
-				Document json = processJSONstring(clientMsg);
-				try {
-					handleJsonClientMsg(json, clientSocket, in, out);
-				} catch (NoSuchAlgorithmException e) {
-
-					e.printStackTrace();
-				}
-
-
 			}
 		} catch (SocketException ex) {
 			ex.printStackTrace();
@@ -302,7 +285,7 @@ public class ServerConnection implements Runnable {
 			e.printStackTrace();
 		}
 		finally {
-			if(listeningSocket != null) {
+			if (listeningSocket != null) {
 				try {
 					listeningSocket.close();
 				} catch (IOException e) {
@@ -310,5 +293,21 @@ public class ServerConnection implements Runnable {
 				}
 			}
 		}
+	}
+
+	private int getMaximumIncomingConnections() {
+		return this.maximumIncomingConnections;
+	}
+
+	private String getAdvertisedName() {
+		return this.advertisedHost;
+	}
+
+	private int getPort() {
+		return this.port;
+	}
+
+	private ServerSocket getListeningSocket() {
+		return this.listeningSocket;
 	}
 }

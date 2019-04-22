@@ -29,9 +29,9 @@ public class Peer
 		//Server Setup, get Port and Advertised name from properties
 		String advertisedName = Configuration.getConfigurationValue("advertisedName");
 		int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
-		int maximumincomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumincomingConnections"));
+		int maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncomingConnections"));
 		ServerMain serverMain = new ServerMain();
-		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumincomingConnections, serverMain);
+		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumIncomingConnections, serverMain);
 		
 		//Start Server Thread to accept incoming connections
 		Runnable runnable = new ServerConnection(serverConnection);
