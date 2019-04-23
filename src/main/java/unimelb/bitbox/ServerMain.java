@@ -60,24 +60,33 @@ public class ServerMain implements FileSystemObserver, Runnable {
     private void handleJsonClientMsg(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         String invalidProtocol;
+        Document fileDescriptor;
+        String md5;
+        String lastModified;
+        String fileSize;
+        String pathName;
+        String message;
+        Long position;
+        Long length;
+        String content;
+
+        boolean status;
 
         switch (command){
 
             case "FILE_CREATE_REQUEST":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
+                pathName = json.getString("pathName");
 
                 // Check message credibility
                 // Check lastModified, check fileSize, and pathName (not sure what md5 is)
                 //if ()
 
-                        String message;
-                        boolean status;
                         String fileCreateResponse = this.json.getFileCreateResponse(md5, Long.parseLong(lastModified), Long.parseLong(fileSize), pathName, message, status);
                         out.write(fileCreateResponse+"\n");
                         out.flush();
@@ -99,14 +108,14 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "FILE_CREATE_RESPONSE":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
-                String message = json.getString("message");
-                boolean status = json.getBoolean("status");
+                pathName = json.getString("pathName");
+                message = json.getString("message");
+                status = json.getBoolean("status");
 
                 // Check whether it was successful
                 if (status == true) {
@@ -118,32 +127,32 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "FILE_DELETE_REQUEST":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
+                pathName = json.getString("pathName");
 
                 // Check message credibility
                 //if ()
 
-                    String message;
-                    Boolean status;
+                    //message="depends on checks made before this point";
+                    //status; depends whether successful or not
                     String fileDeleteResponse = this.json.getFileDeleteResponse(md5, Long.parseLong(lastModified), Long.parseLong(fileSize), pathName, message, status);
                     out.write(fileDeleteResponse+"\n");
                     out.flush();
 
             case "FILE_DELETE_RESPONSE":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
-                String message = json.getString("message");
-                boolean status = json.getBoolean("status");
+                pathName = json.getString("pathName");
+                message = json.getString("message");
+                status = json.getBoolean("status");
 
                 // Check whether it was successful
                 if (status == true) {
@@ -154,12 +163,12 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "FILE_MODIFY_REQUEST":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
+                pathName = json.getString("pathName");
 
                 // Check message credibility
                 //if ()
@@ -170,14 +179,14 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "FILE_MODIFY_RESPONSE":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
-                String message = json.getString("message");
-                Boolean status = json.getBoolean("status");
+                pathName = json.getString("pathName");
+                message = json.getString("message");
+                status = json.getBoolean("status");
 
                 // Check whether it was successful
                 if (status == true) {
@@ -193,17 +202,15 @@ public class ServerMain implements FileSystemObserver, Runnable {
                 // Check message credibility
                 //if ()
 
-                    String message;
-                    boolean status;
                     String directoryCreateResponse = this.json.getDirectoryCreateResponse(pathName, message, status);
                     out.write(directoryCreateResponse+"\n");
                     out.flush();
 
             case "DIRECTORY_CREATE_RESPONSE":
 
-                String pathName = json.getString("pathName");
-                String message = json.getString("message");
-                Boolean status = json.getBoolean("status")
+                pathName = json.getString("pathName");
+                message = json.getString("message");
+                status = json.getBoolean("status")
 
                 // Check whether it was successful
                 if (status == true) {
@@ -214,22 +221,20 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "DIRECTORY_DELETE_REQUEST":
 
-                String pathName = json.getString("pathName");
+                pathName = json.getString("pathName");
 
                 // Check message credibility
                 //if ()
 
-                    String message;
-                    boolean status;
                     String directoryDeleteResponse = this.json.getDirectoryDeleteResponse(pathName, message, status);
                     out.write(directoryDeleteResponse+"\n");
                     out.flush();
 
             case "DIRECTORY_DELETE_RESPONSE":
 
-                String pathName = json.getString("pathName");
-                String message = json.getString("message");
-                Boolean status = json.getBoolean("status");
+                pathName = json.getString("pathName");
+                message = json.getString("message");
+                status = json.getBoolean("status");
 
                 // Check whether it was successful
                 if (status == true) {
@@ -240,28 +245,28 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
             case "FILE_BYTES_REQUEST":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
-                Long position = json.getLong("position");
-                Long length = json.getLong("length");
+                pathName = json.getString("pathName");
+                position = json.getLong("position");
+                length = json.getLong("length");
 
             case "FILE_BYTES_RESPONSE":
 
-                Document fileDescriptor = (Document) json.get("fileDescriptor");
-                String md5 = fileDescriptor.getString("md5");
-                String lastModified = fileDescriptor.getString("lastModified");
-                String fileSize = fileDescriptor.getString("fileSize");
+                fileDescriptor = (Document) json.get("fileDescriptor");
+                md5 = fileDescriptor.getString("md5");
+                lastModified = fileDescriptor.getString("lastModified");
+                fileSize = fileDescriptor.getString("fileSize");
 
-                String pathName = json.getString("pathName");
-                Long position = json.getLong("position");
-                Long length = json.getLong("length");
-                String message = json.getString("message");
-                String content = json.getString("content");
-                Boolean status = json.getBoolean("status");
+                pathName = json.getString("pathName");
+                position = json.getLong("position");
+                length = json.getLong("length");
+                message = json.getString("message");
+                content = json.getString("content");
+                status = json.getBoolean("status");
 
                 // Check whether it was successful
                 if (status == true) {
