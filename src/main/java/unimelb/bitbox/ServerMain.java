@@ -57,10 +57,242 @@ public class ServerMain implements FileSystemObserver, Runnable {
 		
 	}
 
+    private void handleJsonClientMsg(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+        String command = json.getString("command");
+        String invalidProtocol;
+
+        switch (command){
+
+            case "FILE_CREATE_REQUEST":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+
+                // Check message credibility
+                // Check lastModified, check fileSize, and pathName (not sure what md5 is)
+                //if ()
+
+                        String message;
+                        boolean status;
+                        String fileCreateResponse = this.json.getFileCreateResponse(md5, Long.parseLong(lastModified), Long.parseLong(fileSize), pathName, message, status);
+                        out.write(fileCreateResponse+"\n");
+                        out.flush();
+                        /*
+                        // Start peer thread to manage P2P communication in separate thread per peer
+
+                        Runnable runnable = new ServerMain(serverMain, clientSocket, in, out);
+                        Thread thread = new Thread(runnable);
+                        thread.start();
+                        log.info("P2P Connection Thread Running");
+
+                else {
+                    invalidProtocol = this.json.getInvalidProtocol("message must contain xx field");
+                    log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+                    out.write(invalidProtocol+"\n");
+                    out.flush();
+                }*/
+            break;
+
+            case "FILE_CREATE_RESPONSE":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+                String message = json.getString("message");
+                boolean status = json.getBoolean("status");
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+
+            case "FILE_DELETE_REQUEST":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+
+                // Check message credibility
+                //if ()
+
+                    String message;
+                    Boolean status;
+                    String fileDeleteResponse = this.json.getFileDeleteResponse(md5, Long.parseLong(lastModified), Long.parseLong(fileSize), pathName, message, status);
+                    out.write(fileDeleteResponse+"\n");
+                    out.flush();
+
+            case "FILE_DELETE_RESPONSE":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+                String message = json.getString("message");
+                boolean status = json.getBoolean("status");
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+            case "FILE_MODIFY_REQUEST":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+
+                // Check message credibility
+                //if ()
+
+                    String fileModifyResponse = this.json.getFileModifyResponse(md5, Long.parseLong(lastModified), Long.parseLong(fileSize), pathName, message, status);
+                    out.write(fileModifyResponse+"\n");
+                    out.flush();
+
+            case "FILE_MODIFY_RESPONSE":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+                String message = json.getString("message");
+                Boolean status = json.getBoolean("status");
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+            case "DIRECTORY_CREATE_REQUEST":
+
+                String pathName = json.getString("pathName");
+
+                // Check message credibility
+                //if ()
+
+                    String message;
+                    boolean status;
+                    String directoryCreateResponse = this.json.getDirectoryCreateResponse(pathName, message, status);
+                    out.write(directoryCreateResponse+"\n");
+                    out.flush();
+
+            case "DIRECTORY_CREATE_RESPONSE":
+
+                String pathName = json.getString("pathName");
+                String message = json.getString("message");
+                Boolean status = json.getBoolean("status")
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+            case "DIRECTORY_DELETE_REQUEST":
+
+                String pathName = json.getString("pathName");
+
+                // Check message credibility
+                //if ()
+
+                    String message;
+                    boolean status;
+                    String directoryDeleteResponse = this.json.getDirectoryDeleteResponse(pathName, message, status);
+                    out.write(directoryDeleteResponse+"\n");
+                    out.flush();
+
+            case "DIRECTORY_DELETE_RESPONSE":
+
+                String pathName = json.getString("pathName");
+                String message = json.getString("message");
+                Boolean status = json.getBoolean("status");
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+            case "FILE_BYTES_REQUEST":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+                Long position = json.getLong("position");
+                Long length = json.getLong("length");
+
+            case "FILE_BYTES_RESPONSE":
+
+                Document fileDescriptor = (Document) json.get("fileDescriptor");
+                String md5 = fileDescriptor.getString("md5");
+                String lastModified = fileDescriptor.getString("lastModified");
+                String fileSize = fileDescriptor.getString("fileSize");
+
+                String pathName = json.getString("pathName");
+                Long position = json.getLong("position");
+                Long length = json.getLong("length");
+                String message = json.getString("message");
+                String content = json.getString("content");
+                Boolean status = json.getBoolean("status");
+
+                // Check whether it was successful
+                if (status == true) {
+                }
+                else {
+                    // retry?
+                }
+
+
+
+            /*default:
+                invalidProtocol = this.json.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
+                log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+                out.write(invalidProtocol+"\n");
+                out.flush();*/
+
+        }
+
+    }
+
+
+    private Document proocessJSONstring(String jsonMessage) {
+        Document json = new Document();
+        json = Document.parse(jsonMessage);
+        return json;
+    }
+
 	@Override
 	public void run() {
-		/*
-		BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+
+		/*BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
 		BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
 		
 		while (true) {
@@ -121,6 +353,6 @@ public class ServerMain implements FileSystemObserver, Runnable {
 			}
 			
 		}
-		*/	
-	}
+
+	}*/
 }
