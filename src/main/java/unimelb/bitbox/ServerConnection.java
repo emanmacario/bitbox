@@ -94,19 +94,6 @@ public class ServerConnection implements Runnable {
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
-
-
-		/* finally {
-			// Close the socket
-			if (socket != null) {
-				try {
-					System.out.println("Socket was closed");
-					socket.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-		}*/
 	}
 
 	private void handleJsonServerMsg(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
