@@ -3,12 +3,9 @@ package unimelb.bitbox;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.net.SocketException;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.logging.Logger;
@@ -25,14 +22,14 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	private String host;
 	private Integer port;
 	private ServerMain serverMain;
-	
+
 	boolean isEmpty= true;
 	private Socket clientSocket;
 	private BufferedReader in;
 	private BufferedWriter out;
-	
+
 	private Queue<String> eventsQ = new LinkedList<>();
-	
+
 	public ServerMain() throws NumberFormatException, IOException, NoSuchAlgorithmException {
 		// Main Server (self) constructor
 		fileSystemManager=new FileSystemManager(Configuration.getConfigurationValue("path"),this);
@@ -48,82 +45,71 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
 	@Override
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
+		// Responsible for handling outgoing requests
+
+		System.out.println(fileSystemEvent.name);
+		System.out.println(fileSystemEvent.path);
+		System.out.println(fileSystemEvent.pathName);
+		System.out.println(fileSystemEvent.event.name());
+		// System.out.println(fileSystemEvent.fileDescriptor);
 		//System.out.println(fileSystemEvent.event.name());
-		eventsQ.add(fileSystemEvent.event.name());
+		// eventsQ.add(fileSystemEvent.event.name());
 		//System.out.println( eventsQ.toString());
 		//System.out.println( eventsQ.size());
-		
+
+
+
+
 	}
 
 	@Override
 	public void run() {
+		// Responsible for handling incoming requests from
+		// a single peer, until that connection is closed
+		try {
+			while (true) {
+				// Read the incoming request from the input buffer
+				String clientMsg = null;
+				try {
+					while ((clientMsg = in.readLine()) != null) {
+						// Logging
+						log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMsg);
 
-		// Process replies and requests to a single peer
-		while (true) {
+						// Parse the request into a JSON object
+						Document json = Document.parse(clientMsg);
 
-			if (eventsQ.size() > 0) {
-				String event = eventsQ.remove();
-				System.out.println(event);
+						// Handle the incoming request
+						try {
+							handleClientRequest(json);
+						} catch (NoSuchAlgorithmException | IOException e) {
+							System.out.println("Socket closed");
+							e.printStackTrace();
+						}
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
-
-
-
-			/*
-			String clientMsg = null;
-			try {
-				while((clientMsg = in.readLine()) != null) {  
-				 System.out.println("INCOMING "+ Thread.currentThread().getName() + ": " + clientMsg);
-				 
-				 }}
-		
-			catch(SocketException e) {
-				System.out.println("closed...");
-			}
-			//clientSocket.close();
-			Document json1 = proocessJSONstring(clientMsg);
-			try {
-				handleJsonClientMsg(json1, in,out, clientSocket);
-			} catch (NoSuchAlgorithmException e) {
-				 
-				e.printStackTrace();
-			}
-			
-
-		}
-	} catch (SocketException ex) {
-		ex.printStackTrace();
-	}catch (IOException e) {
-		e.printStackTrace();
-	} 
-	finally {
-		if(listeningSocket != null) {
-			try {
-				listeningSocket.close();
-			} catch (IOException e) {
-				e.printStackTrace();
+		} finally {
+			if (clientSocket != null) {
+				// Close the connection
+				try {
+					log.info("Client socket was closed");
+					clientSocket.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
 		}
-	
-			
-			
-			try {
-				Thread.sleep(200);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			//System.out.println(ServerConnection.eventsQ.size());
-			
-			if (ServerConnection.eventsQ.size() > 0) {
-				//Send Events from Q
-				System.out.println(ServerConnection.eventsQ.toString());
-				ServerConnection.eventsQ.remove();
-				isEmpty = false;
-			}else if (!isEmpty && ServerConnection.eventsQ.size() == 0) {
-				System.out.println("Empty");
-				isEmpty = true;
-			} */
-			
-		}
+	}
+
+	/**
+	 * Handles an incoming client request
+	 * @param request
+	 * @throws NoSuchAlgorithmException
+	 * @throws IOException
+	 */
+	private void handleClientRequest(Document request) throws NoSuchAlgorithmException, IOException {
+
 	}
 }

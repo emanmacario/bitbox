@@ -85,24 +85,28 @@ public class ServerConnection implements Runnable {
 			received = in.readLine(); // This method blocks until there
 			Document json = processJSONstring(received);
 			handleJsonServerMsg(json, socket, in,  out);
-			System.out.println("INCOMING: " + received);
+			log.info("Incoming response: " + received);
 		} catch (UnknownHostException e) {
 			// e.printStackTrace();
 		} catch (IOException e) {
-			log.warning("while connecting to " + host + ":" + port + "Connection Refused");
+			log.warning("while connecting to " + host + ":" + port + " connection refused");
 			// e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
-		} finally {
+		}
+
+
+		/* finally {
 			// Close the socket
 			if (socket != null) {
 				try {
+					System.out.println("Socket was closed");
 					socket.close();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
-		}
+		}*/
 	}
 
 	private void handleJsonServerMsg(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
@@ -176,7 +180,6 @@ public class ServerConnection implements Runnable {
 		Integer port =  (int) hostPort.getLong("port");
 		String host = hostPort.getString("host");
 
-		System.out.println("== CHECKING HANDSHAKE REQUEST ==");
 		switch (command){
 
 		case "HANDSHAKE_REQUEST":
@@ -266,11 +269,10 @@ public class ServerConnection implements Runnable {
 				try {
 
 					clientMsg = in.readLine(); // Blocking receive call
-					System.out.println("NEW MESSAGE RECEIVED: " + clientMsg);
+					log.info("Incoming request: " + clientMsg);
 					Document json = processJSONstring(clientMsg);
 
 					try {
-						System.out.println("Handling new client message...");
 						handleJsonClientMsg(json, clientSocket, in, out);
 					} catch (NoSuchAlgorithmException e) {
 						e.printStackTrace();
@@ -287,6 +289,7 @@ public class ServerConnection implements Runnable {
 		finally {
 			if (listeningSocket != null) {
 				try {
+					log.info("Listening socket closed");
 					listeningSocket.close();
 				} catch (IOException e) {
 					e.printStackTrace();
