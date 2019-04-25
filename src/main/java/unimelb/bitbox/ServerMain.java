@@ -29,7 +29,7 @@ import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 public class ServerMain implements FileSystemObserver, Runnable {
 	private static Logger log = Logger.getLogger(ServerMain.class.getName());
 	private static FileSystemManager fileSystemManager; // MADE STATIC SO ALL THREADS CAN ACCESS IT, ALSO PRIVATE
-	private List<ServerMain> threads;
+	private static List<ServerMain> threads;            // SAME REASONING AS ABOVE ^
 
 	// ServerMain object instance variables
 	private String host;
@@ -49,26 +49,27 @@ public class ServerMain implements FileSystemObserver, Runnable {
 		threads = new ArrayList<>();
 	}
 
-	// Constructor for threads
+	// Thread constructor
 	public ServerMain(ServerMain serverMain, Socket clientSocket, BufferedReader in, BufferedWriter out) {
 		this.serverMain = serverMain;
 		this.clientSocket = clientSocket;
 		this.in = in;
 		this.out = out;
 		// Add this thread to the list of threads
-		serverMain.threads.add(this);
+		threads.add(this);
 		// Initalise a queue for file system events
-		events = new LinkedList<>();
+		this.events = new LinkedList<>();
 	}
 
 	@Override
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
 		// Enqueue the file system event in every thread
+		log.info("Name: " + fileSystemEvent.event.name());
 		for (ServerMain sm : threads) {
 			sm.events.add(fileSystemEvent);
+			System.out.println("Size of Q: " + sm.events.size());
 		}
 	}
-
 
 	/**
 	 * Responsible for handling incoming requests from
@@ -76,20 +77,33 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	 */
 	@Override
 	public void run() {
+
 		try {
 			while (true) {
+				// DEBUGGING
+				try {
+					Thread.sleep(1500);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+
 				// Process file system events, relay them
 				// as outgoing messages to connected peers
+
 				FileSystemEvent event;
 				try {
-					if ((event = events.poll()) != null) {
+					if ((event = this.events.poll()) != null) {
+						log.info("NEW FILE SYSTEM EVENT");
 						handleOutgoingClientMessage(event);
 					}
 				} catch (NoSuchAlgorithmException | IOException e) {
 					e.printStackTrace();
 				}
 
-				// Read any incoming request from the input buffer
+
+				// Read any incoming request from the input buffer.
+				// This blocks until an incoming message is received.
+				// TODO: Figure out how to get this to NOT block
 				String clientMsg = null;
 				try {
 					while ((clientMsg = in.readLine()) != null) {
@@ -104,7 +118,6 @@ public class ServerMain implements FileSystemObserver, Runnable {
 							handleIncomingClientMessage(json);
 						} catch (NoSuchAlgorithmException | IOException e) {
 							System.out.println("Socket closed");
-							e.printStackTrace();
 						}
 					}
 				} catch (IOException e) {
@@ -117,7 +130,7 @@ public class ServerMain implements FileSystemObserver, Runnable {
 				try {
 					log.info("Client socket was closed");
 					clientSocket.close();
-					serverMain.threads.remove(this);
+					threads.remove(this);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -126,7 +139,7 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	}
 
 	/**
-	 * Handles an incoming client request
+	 * Handles an incoming client message
 	 * @param clientMsg incoming client message in JSON
 	 * @throws NoSuchAlgorithmException
 	 * @throws IOException
@@ -143,6 +156,21 @@ public class ServerMain implements FileSystemObserver, Runnable {
 			case "DIRECTORY_DELETE_REQUEST":
 				response = directoryDeleteResponse(clientMsg);
 				send(response);
+				break;
+			case "FILE_CREATE_REQUEST":
+			case "FILE_DELETE_REQUEST":
+			case "FILE_MODIFY_REQUEST":
+			case "FILE_BYTES_REQUEST":
+				// TODO: Process above four request types
+				break;
+			case "DIRECTORY_CREATE_RESPONSE":
+			case "DIRECTORY_DELETE_RESPONSE":
+			case "FILE_CREATE_RESPONSE":
+			case "FILE_DELETE_RESPONSE":
+			case "FILE_MODIFY_RESPONSE":
+			case "FILE_BYTES_RESPONSE":
+				// TODO: Process all response types
+				log.info("INCOMING RESPONSE: " + clientMsg.toString());
 				break;
 			default:
 				// Invalid protocol
@@ -208,27 +236,51 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	 */
 	private void handleOutgoingClientMessage(FileSystemEvent fileSystemEvent) throws NoSuchAlgorithmException, IOException {
 		String command = fileSystemEvent.event.name();
-		Document fileDescriptor;
-		String md5;
-		String lastModified;
-		String fileSize;
-		String message;
+		FileSystemManager.FileDescriptor fileDescriptor = fileSystemEvent.fileDescriptor;
 		String pathName = fileSystemEvent.pathName;
-		Long position;
-		Long length;
-		String content;
 
+		// Only for file events
+		String md5 = null;
+		Long lastModified = null;
+		Long fileSize = null;
+
+		// Construct and send outgoing request
 		String request;
 		switch (command) {
-			case "DIRECTORY_CREATE_REQUEST":
+			case "DIRECTORY_CREATE":
 				request = Messages.getDirectoryCreateRequest(pathName);
 				send(request);
 				break;
-			case "DIRECTORY_DELETE_REQUEST":
+			case "DIRECTORY_DELETE":
 				request = Messages.getDirectoryDeleteRequest(pathName);
 				send(request);
 				break;
+			case "FILE_CREATE":
+			case "FILE_DELETE":
+			case "FILE_MODIFY":
+				assert(fileDescriptor != null);
+				md5 = fileDescriptor.md5;
+				lastModified = fileDescriptor.lastModified;
+				fileSize = fileDescriptor.lastModified;
+				switch (command) {
+					case "FILE_CREATE":
+						request = Messages.getFileCreateRequest(md5, lastModified, fileSize, pathName);
+						send(request);
+						break;
+					case "FILE_DELETE":
+						request = Messages.getFileDeleteRequest(md5, lastModified, fileSize, pathName);
+						send(request);
+						break;
+					case "FILE_MODIFY":
+						request = Messages.getFileModifyRequest(md5, lastModified, fileSize, pathName);
+						send(request);
+						break;
+					default:
+						break;
+				}
+				break;
 			default:
+				log.warning("Invalid command arose from file system event");
 				break;
 		}
 	}
@@ -236,11 +288,12 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	/**
 	 * Sends a request/response string to the connected peer.
 	 * Appends a newline char to the outgoing message.
-	 * @param response the response string
+	 * @param message request or response message
 	 * @throws IOException
 	 */
-	private void send(String response) throws IOException {
-		out.write(response + '\n');
+	private void send(String message) throws IOException {
+		out.write(message + '\n');
 		out.flush();
+		log.info("Sending: " + message);
 	}
 }
