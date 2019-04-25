@@ -23,9 +23,8 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	private static Logger log = Logger.getLogger(ServerMain.class.getName());
 	protected FileSystemManager fileSystemManager;
 	private String host;
-	private Long port;
+	private Integer port;
 	private ServerMain serverMain;
-	static HashMap<String, Long> peersConnected = new HashMap();
 	
 	boolean isEmpty= true;
 	private Socket clientSocket;
@@ -35,11 +34,11 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	private Queue<String> eventsQ = new LinkedList<>();
 	
 	public ServerMain() throws NumberFormatException, IOException, NoSuchAlgorithmException {
-		//Main Server (self) constructor
+		// Main Server (self) constructor
 		fileSystemManager=new FileSystemManager(Configuration.getConfigurationValue("path"),this);
 	}
 
-
+	// Constructor for threading
 	public ServerMain(ServerMain serverMain, Socket clientSocket, BufferedReader in, BufferedWriter out) {
 		this.serverMain = serverMain;
 		this.clientSocket = clientSocket;
@@ -49,22 +48,27 @@ public class ServerMain implements FileSystemObserver, Runnable {
 
 	@Override
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
-		//System.out.println("TEST");
-		System.out.println(fileSystemEvent.event.name());
+		//System.out.println(fileSystemEvent.event.name());
 		eventsQ.add(fileSystemEvent.event.name());
-		 System.out.println( eventsQ.toString());
-		System.out.println( eventsQ.size());
+		//System.out.println( eventsQ.toString());
+		//System.out.println( eventsQ.size());
 		
 	}
 
 	@Override
 	public void run() {
-		/*
-		BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
-		BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
-		
+
+		// Process replies and requests to a single peer
 		while (true) {
-			
+
+			if (eventsQ.size() > 0) {
+				String event = eventsQ.remove();
+				System.out.println(event);
+			}
+
+
+
+			/*
 			String clientMsg = null;
 			try {
 				while((clientMsg = in.readLine()) != null) {  
@@ -118,9 +122,8 @@ public class ServerMain implements FileSystemObserver, Runnable {
 			}else if (!isEmpty && ServerConnection.eventsQ.size() == 0) {
 				System.out.println("Empty");
 				isEmpty = true;
-			}
+			} */
 			
 		}
-		*/	
 	}
 }
