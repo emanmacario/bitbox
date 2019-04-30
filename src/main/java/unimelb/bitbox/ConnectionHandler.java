@@ -132,7 +132,7 @@ public class ConnectionHandler implements Runnable {
                     host = peer.getString("host");
                     if (host != null && port != null) {
                         if (!controller.isPeerConnected(host, port)) {
-                            controller.addOutgoingConnection(socket);
+                            connect(host, port);
                         }
                     } else {
                         invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
