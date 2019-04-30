@@ -41,6 +41,8 @@ public class ServerConnection implements Runnable {
 	private String advertisedHost;
 	private FileSystemManager fileSystemManager;
 	private ServerMain serverMain;
+
+	PeerConnectionController controller;
  
 	
 	public ServerConnection(String advertisedHost, int port, int maximumIncomingConnections, ServerMain serverMain) throws IOException {

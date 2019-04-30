@@ -30,6 +30,13 @@ public class Peer
 		String advertisedName = Configuration.getConfigurationValue("advertisedName");
 		int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
 		int maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncomingConnections"));
+
+
+		ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName);
+		Thread connectionHandlerThread = new Thread(connectionHandler);
+		connectionHandlerThread.start();
+
+		/*
 		ServerMain serverMain = new ServerMain();
 		ServerConnection serverConnection = new ServerConnection(advertisedName, serverPort, maximumIncomingConnections, serverMain);
 		
@@ -38,6 +45,7 @@ public class Peer
 		Thread thread = new Thread(runnable);
 		thread.start();
 		log.info("Connection Management Thread Running");
+		 */
 
 
 		/*
@@ -98,13 +106,11 @@ public class Peer
 
 			for (Map.Entry<String, String> hostPortMapEntry : hostPortMap.entrySet()) {
 				String host = hostPortMapEntry.getKey();
-				String port = hostPortMapEntry.getValue();
-
-				serverConnection.connect(host,port);
+				int port = Integer.parseInt(hostPortMapEntry.getValue());
+				connectionHandler.connect(host,port);
 				Thread.sleep(1000);
 				//System.out.println(value);
 			}
-						
 		}
 	}
 }

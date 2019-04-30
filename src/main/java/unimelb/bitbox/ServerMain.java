@@ -77,6 +77,7 @@ public class ServerMain implements FileSystemObserver, Runnable {
 	 */
 	@Override
 	public void run() {
+		System.out.println("isEmpty: " + isEmpty);
 
 		try {
 			while (true) {

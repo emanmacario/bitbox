@@ -42,10 +42,6 @@ public class PeerClient implements Runnable {
     public void run() {
 
         while (!closed) {
-
-            // TODO: Handle generateSyncEvents() from FileSystemManager
-            // ...
-
             // Process general file system events, relay them
             // as outgoing messages to connected peers
             FileSystemManager.FileSystemEvent event;
