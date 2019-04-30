@@ -28,9 +28,9 @@ public class ConnectionHandler implements Runnable {
 
 
     /**
-     * Attempt to establish a new connection between
-     * this peer and another peer described by 'host'
-     * and 'port'
+     * Attempt to establish a new connection between this
+     * peer and another peer described by hostname 'host'
+     * and port number 'port'
      * @param host the host name of the peer
      * @param port the port number of the peer
      */
@@ -51,8 +51,6 @@ public class ConnectionHandler implements Runnable {
             handleJSONServerMessage(handshakeResponseJSON, clientSocket, in, out);
             log.info("Incoming response: " + handshakeResponse);
 
-        }catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
         } catch (IOException e) {
             log.warning("while connecting to " + host + ":" + port + " connection refused");
         }
@@ -101,7 +99,7 @@ public class ConnectionHandler implements Runnable {
     }
 
 
-    private void handleJSONServerMessage(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+    private void handleJSONServerMessage(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException {
         String command = json.getString("command");
         String invalidProtocol;
 
@@ -119,8 +117,7 @@ public class ConnectionHandler implements Runnable {
                         send(invalidProtocol, out);
                     } else {
                         // Start threads for the outgoing connection
-                        PeerConnection connection = new PeerConnection(socket);
-                        controller.addOutgoingConnection(connection);
+                        controller.addOutgoingConnection(socket);
                     }
                 } else {
                     invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
@@ -135,8 +132,7 @@ public class ConnectionHandler implements Runnable {
                     host = peer.getString("host");
                     if (host != null && port != null) {
                         if (!controller.isPeerConnected(host, port)) {
-                            PeerConnection connection = new PeerConnection(socket);
-                            controller.addOutgoingConnection(connection);
+                            controller.addOutgoingConnection(socket);
                         }
                     } else {
                         invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
@@ -176,8 +172,7 @@ public class ConnectionHandler implements Runnable {
                         log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, port);
                         send(handShakeResponse, out);
-                        PeerConnection connection = new PeerConnection(clientSocket);
-                        controller.addIncomingConnection(connection);
+                        controller.addIncomingConnection(clientSocket);
                     }
                 } else {
                     invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");

@@ -6,9 +6,7 @@ import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystem;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -30,30 +28,6 @@ public class PeerClient implements Runnable {
         this.events = new LinkedList<>();
         this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
         this.closed = false;
-    }
-
-    /**
-     * Responsible for handling outgoing requests generated
-     * by general file system events to a single connected peer,
-     * until that connection is closed. Also generates
-     * and sends sync events after every syncInterval period.
-     */
-    @Override
-    public void run() {
-
-        while (!closed) {
-            // Process general file system events, relay them
-            // as outgoing messages to connected peers
-            FileSystemManager.FileSystemEvent event;
-            try {
-                if ((event = this.events.poll()) != null) {
-                    log.info("NEW FILE SYSTEM EVENT");
-                    handleOutgoingClientMessage(event);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     /**
@@ -117,9 +91,42 @@ public class PeerClient implements Runnable {
         this.closed = true;
     }
 
-
     public void enqueue(FileSystemEvent event) {
+        log.info(event.event.name() + " added to PeerClient queue");
         this.events.add(event);
+    }
+
+    /**
+     * Responsible for handling outgoing requests generated
+     * by general file system events to a single connected peer,
+     * until that connection is closed. Also generates
+     * and sends sync events after every syncInterval period.
+     */
+    @Override
+    public void run() {
+
+        while (!closed) {
+            try {
+                // Need to sleep to ensure file system events
+                // are actually processed. If we don't then
+                // for some reason they aren't processed.
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // Process general file system events, relay them
+            // as outgoing messages to connected peers
+            FileSystemManager.FileSystemEvent event;
+            try {
+                if ((event = this.events.poll()) != null) {
+                    log.info("PROCESSING NEW FILE SYSTEM EVENT");
+                    handleOutgoingClientMessage(event);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**

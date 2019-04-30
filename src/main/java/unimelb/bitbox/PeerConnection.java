@@ -1,5 +1,6 @@
 package unimelb.bitbox;
 
+import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
@@ -18,19 +19,21 @@ public class PeerConnection {
 
     private PeerClient client;
     private PeerServer server;
+    private FileSystemManager fileSystemManager;
 
-    public PeerConnection(Socket clientSocket) throws IOException {
+    public PeerConnection(Socket clientSocket, FileSystemManager fileSystemManager) throws IOException {
         this.clientSocket = clientSocket;
         this.clientHostName = clientSocket.getInetAddress().getHostName();
         this.clientPort = clientSocket.getLocalPort();
         this.in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
         this.out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+        this.client = new PeerClient(fileSystemManager, out);
+        this.server = new PeerServer(fileSystemManager, in, out);
         this.start();
-        log.info("Peer-to-Peer Connection Thread Running");
     }
 
     public void onNewFileSystemEvent(FileSystemEvent event) {
-        client.enqueue(event);
+        this.client.enqueue(event);
     }
 
     public void onNewSyncEvents(List<FileSystemEvent> syncEvents) {
@@ -44,8 +47,8 @@ public class PeerConnection {
      * for this established connection.
      */
     public void close() {
-        client.close();
-        server.close();
+        this.client.close();
+        this.server.close();
     }
 
     /**
@@ -56,11 +59,14 @@ public class PeerConnection {
         Thread serverThread = new Thread(server);
         clientThread.start();
         serverThread.start();
+        log.info("PeerClient Thread running");
+        log.info("PeerServer Thread running");
     }
 
     public String getHost() {
         return this.clientHostName;
     }
+
     public int getPort() {
         return this.clientPort;
     }

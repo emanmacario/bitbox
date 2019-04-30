@@ -33,6 +33,8 @@ public class PeerServer implements Runnable {
     public void run() {
 
         while (!closed) {
+            log.info("PeerServer Thread still running...");
+
             // Read any incoming request from the input buffer.
             // This blocks until an incoming message is received.
             String clientMessage = null;
