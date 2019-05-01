@@ -66,8 +66,8 @@ public class Messages {
 	public static String getFileCreateRequest(String md5, Long lastModified, Long fileSize, String pathName) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -80,8 +80,8 @@ public class Messages {
 	public static String getFileCreateResponse(String md5, Long lastModified, Long fileSize, String pathName, String message, boolean status) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -95,8 +95,8 @@ public class Messages {
 	public static String getFileBytesRequest(String md5, Long lastModified, Long fileSize, String pathName, long position, long length) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -110,8 +110,8 @@ public class Messages {
 	public static String getFileBytesResponse(String md5, Long lastModified, Long fileSize, String pathName, long position, long length, String content,String message, boolean status) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -128,8 +128,8 @@ public class Messages {
 	public static String getFileDeleteRequest(String md5, Long lastModified, Long fileSize, String pathName) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -142,8 +142,8 @@ public class Messages {
 	public static String getFileDeleteResponse(String md5, Long lastModified, Long fileSize, String pathName,String message, boolean status) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -158,8 +158,8 @@ public class Messages {
 	public static String getFileModifyRequest(String md5, Long lastModified, Long fileSize, String pathName) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
@@ -172,8 +172,8 @@ public class Messages {
 	public static String getFileModifyResponse(String md5, Long lastModified, Long fileSize, String pathName,String message, boolean status) {
 		Document doc1 = new Document();
         doc1.append("md5",md5);
-        doc1.append("lastModified",lastModified.toString());
-        doc1.append("fileSize",fileSize.toString());
+        doc1.append("lastModified",lastModified);
+        doc1.append("fileSize",fileSize);
         
         Document doc2 = new Document();
 		doc2.append("fileDescriptor",doc1);
