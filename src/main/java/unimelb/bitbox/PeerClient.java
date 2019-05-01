@@ -63,7 +63,7 @@ public class PeerClient implements Runnable {
                 assert(fileDescriptor != null);
                 md5 = fileDescriptor.md5;
                 lastModified = fileDescriptor.lastModified;
-                fileSize = fileDescriptor.lastModified;
+                fileSize = fileDescriptor.fileSize;
                 switch (command) {
                     case "FILE_CREATE":
                         request = Messages.getFileCreateRequest(md5, lastModified, fileSize, pathName);
