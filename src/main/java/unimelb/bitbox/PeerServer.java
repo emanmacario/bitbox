@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.logging.Logger;
@@ -175,10 +176,11 @@ public class PeerServer implements Runnable {
         String md5 = fileDescriptor.getString("md5");
         Long lastModified = fileDescriptor.getLong("lastModified");
         Long fileSize = fileDescriptor.getLong("fileSize");
+        /*
         log.info("MD5 Hash: " + md5);
         log.info("Last Modified: " + lastModified);
         log.info("File Size: " + fileSize);
-
+         */
 
         // Validate the file create request and an appropriate response
         String message;
@@ -311,11 +313,11 @@ public class PeerServer implements Runnable {
         if (status) {
             // Encode the file bytes in base 64
             byte[] encodedBuffer = Base64.getEncoder().encode(buffer.array());
-            content = Base64.getEncoder().encodeToString(encodedBuffer);
+            content = new String(encodedBuffer, StandardCharsets.UTF_8);
+            //log.info("Encoded 'content': " + content);
         } else {
             content = "";
         }
-
         // Create and send response
         String response
                 = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
@@ -338,6 +340,7 @@ public class PeerServer implements Runnable {
         } else {
             String content = response.getString("content");
             byte[] decodedBytes = Base64.getDecoder().decode(content);
+            log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
             ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes); // TODO: Check if this is correct
 
             boolean success = fileSystemManager.writeFile(pathName, decodedByteBuffer, position);

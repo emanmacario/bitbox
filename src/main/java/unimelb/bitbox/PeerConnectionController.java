@@ -116,9 +116,9 @@ public class PeerConnectionController implements FileSystemObserver, Runnable {
     public void run() {
         while (true) {
             try {
-                // Thread.sleep(syncInterval * 1000);
+                Thread.sleep(syncInterval * 1000);
                 // DEBUGGING
-                Thread.sleep(15000);
+                //Thread.sleep(15000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
