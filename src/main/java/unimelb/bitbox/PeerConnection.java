@@ -5,30 +5,28 @@ import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.logging.Logger;
 
 public class PeerConnection {
     private static Logger log = Logger.getLogger(PeerConnection.class.getName());
 
-    private Socket clientSocket;
     private String clientHostName;
     private Integer clientPort;
-    private BufferedReader in;
-    private BufferedWriter out;
-
     private PeerClient client;
     private PeerServer server;
-    private FileSystemManager fileSystemManager;
 
-    public PeerConnection(Socket clientSocket, FileSystemManager fileSystemManager) throws IOException {
-        this.clientSocket = clientSocket;
+    public PeerConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
         this.clientHostName = clientSocket.getInetAddress().getHostName();
         this.clientPort = clientSocket.getLocalPort();
-        this.in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
-        this.out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
-        this.client = new PeerClient(fileSystemManager, out);
-        this.server = new PeerServer(fileSystemManager, in, out);
+        BufferedReader in
+                = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+        BufferedWriter out
+                = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
+        this.client = new PeerClient(out);
+        this.server = new PeerServer(in, out);
         this.start();
     }
 

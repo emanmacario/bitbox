@@ -3,7 +3,8 @@ package unimelb.bitbox;
 import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager;
-import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
+import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.FileSystemObserver;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -14,7 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.logging.Logger;
 
-public class PeerServer implements Runnable {
+public class PeerServer implements FileSystemObserver, Runnable {
     private static Logger log = Logger.getLogger(PeerServer.class.getName());
 
     private FileSystemManager fileSystemManager;
@@ -25,16 +26,20 @@ public class PeerServer implements Runnable {
 
     /**
      * PeerServer constructor
-     * @param fileSystemManager the file system manager
      * @param in input buffer for connection
      * @param out output buffer for connection
      */
-    public PeerServer(FileSystemManager fileSystemManager, BufferedReader in, BufferedWriter out) {
-        this.fileSystemManager = fileSystemManager;
+    public PeerServer(BufferedReader in, BufferedWriter out) throws NoSuchAlgorithmException, IOException {
+        this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
         this.in = in;
         this.out = out;
         this.closed = false;
         this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+    }
+
+    @Override
+    public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
+        // Do nothing, let the client thread handle outgoing requests
     }
 
     /**
@@ -51,7 +56,7 @@ public class PeerServer implements Runnable {
             try {
                 while ((clientMessage = in.readLine()) != null) {
                     // Logging
-                    log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMessage);
+                    //log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMessage);
 
                     // Parse the request into a JSON object
                     Document json = Document.parse(clientMessage);
@@ -311,7 +316,7 @@ public class PeerServer implements Runnable {
             // Encode the file bytes in base 64
             byte[] encodedBuffer = Base64.getEncoder().encode(buffer.array());
             content = new String(encodedBuffer, StandardCharsets.UTF_8);
-            log.info("Encoded 'content': " + content);
+            //log.info("Encoded 'content': " + content);
         } else {
             content = "";
         }
@@ -334,7 +339,7 @@ public class PeerServer implements Runnable {
         } else {
             String content = response.getString("content");
             byte[] decodedBytes = Base64.getDecoder().decode(content);
-            log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
+            //log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
             ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes);
 
             boolean success = fileSystemManager.writeFile(pathName, decodedByteBuffer, position);
@@ -387,6 +392,6 @@ public class PeerServer implements Runnable {
     private void send(String message) throws IOException {
         out.write(message + '\n');
         out.flush();
-        log.info("Sending: " + message);
+        //log.info("Sending: " + message);
     }
 }

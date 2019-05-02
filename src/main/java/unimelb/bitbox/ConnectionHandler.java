@@ -48,7 +48,12 @@ public class ConnectionHandler implements Runnable {
             send(handshakeRequest, out);
             String handshakeResponse = in.readLine(); // Blocking receive call
             Document handshakeResponseJSON = Document.parse(handshakeResponse);
-            handleJSONServerMessage(handshakeResponseJSON, clientSocket, in, out);
+            try {
+                handleJSONServerMessage(handshakeResponseJSON, clientSocket, out);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+
             log.info("Incoming response: " + handshakeResponse);
 
         } catch (IOException e) {
@@ -77,6 +82,8 @@ public class ConnectionHandler implements Runnable {
                         handleJSONClientMessage(clientMessageJSON, clientSocket, in, out);
                     } catch (IOException e) {
                         e.printStackTrace();
+                    } catch (NoSuchAlgorithmException e) {
+                        e.printStackTrace();
                     }
                 } catch (SocketException e) {
                     e.printStackTrace();
@@ -99,7 +106,7 @@ public class ConnectionHandler implements Runnable {
     }
 
 
-    private void handleJSONServerMessage(Document json, Socket socket, BufferedReader in ,BufferedWriter out) throws IOException {
+    private void handleJSONServerMessage(Document json, Socket socket, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         String invalidProtocol;
 
@@ -148,7 +155,7 @@ public class ConnectionHandler implements Runnable {
     }
 
 
-    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException {
+    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
         Integer port =  (int) hostPort.getLong("port");
