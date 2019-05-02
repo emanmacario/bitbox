@@ -1,13 +1,11 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.Configuration;
-import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.logging.Logger;
@@ -16,17 +14,13 @@ public class PeerClient implements Runnable {
     private static Logger log = Logger.getLogger(PeerClient.class.getName());
 
     private Queue<FileSystemEvent> events;
-    private FileSystemManager fileSystemManager;
     private BufferedWriter out;
     private boolean closed;
-    private int syncInterval;
 
     // Thread constructor
-    public PeerClient(FileSystemManager fileSystemManager, BufferedWriter out) {
-        this.fileSystemManager = fileSystemManager;
+    public PeerClient(BufferedWriter out) {
         this.out = out;
         this.events = new LinkedList<>();
-        this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
         this.closed = false;
     }
 
@@ -38,7 +32,7 @@ public class PeerClient implements Runnable {
      */
     private void handleOutgoingClientMessage(FileSystemEvent fileSystemEvent) throws IOException {
         String command = fileSystemEvent.event.name();
-        FileSystemManager.FileDescriptor fileDescriptor = fileSystemEvent.fileDescriptor;
+        FileDescriptor fileDescriptor = fileSystemEvent.fileDescriptor;
         String pathName = fileSystemEvent.pathName;
 
         // Only for file events, not directory events
@@ -110,14 +104,14 @@ public class PeerClient implements Runnable {
                 // Need to sleep to ensure file system events
                 // are actually processed. If we don't then
                 // for some reason they aren't processed.
-                Thread.sleep(250);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
             // Process general file system events, relay them
             // as outgoing messages to connected peers
-            FileSystemManager.FileSystemEvent event;
+            FileSystemEvent event;
             try {
                 if ((event = this.events.poll()) != null) {
                     log.info("PROCESSING NEW FILE SYSTEM EVENT");

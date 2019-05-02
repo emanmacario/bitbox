@@ -36,18 +36,18 @@ public class PeerConnectionController implements FileSystemObserver, Runnable {
         this.start();
     }
 
-    public void addIncomingConnection(Socket clientSocket) throws IOException {
+    public void addIncomingConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
         addConnection(clientSocket);
         this.currentIncomingConnections += 1;
     }
 
-    public void addOutgoingConnection(Socket clientSocket) throws IOException {
+    public void addOutgoingConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
         addConnection(clientSocket);
         this.currentOutgoingConnections += 1;
     }
 
-    private void addConnection(Socket clientSocket) throws IOException {
-        PeerConnection connection = new PeerConnection(clientSocket, fileSystemManager);
+    private void addConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
+        PeerConnection connection = new PeerConnection(clientSocket);
         this.connections.add(connection);
     }
 

@@ -107,6 +107,7 @@ public class Peer
 			for (Map.Entry<String, String> hostPortMapEntry : hostPortMap.entrySet()) {
 				String host = hostPortMapEntry.getKey();
 				int port = Integer.parseInt(hostPortMapEntry.getValue());
+				System.out.println("TRYING TO CONNECT TO " + host + ":" + port);
 				connectionHandler.connect(host,port);
 				Thread.sleep(1000);
 				//System.out.println(value);
