@@ -20,7 +20,9 @@ public class PeerConnection {
 
     public PeerConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
         this.clientHostName = clientSocket.getInetAddress().getHostName();
-        this.clientPort = clientSocket.getLocalPort();
+        this.clientPort = clientSocket.getPort();
+        log.info("New connection to peer " + clientHostName + ":" + clientPort);
+
         BufferedReader in
                 = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
         BufferedWriter out

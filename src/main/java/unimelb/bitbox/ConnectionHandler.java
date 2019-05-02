@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Map;
@@ -26,7 +27,6 @@ public class ConnectionHandler implements Runnable {
         this.controller = new PeerConnectionController();
     }
 
-
     /**
      * Attempt to establish a new connection between this
      * peer and another peer described by hostname 'host'
@@ -39,12 +39,12 @@ public class ConnectionHandler implements Runnable {
             // Create client socket, get input and output buffers
             Socket clientSocket = new Socket(host, port);
             BufferedReader in =
-                    new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+                    new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
             BufferedWriter out =
-                    new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+                    new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
 
-            // Attempt to perform a handshake with the peer 'host:port'
-            String handshakeRequest = Messages.getHandshakeRequest(host, port);
+            // Attempt to perform a handshake with the peer
+            String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
             send(handshakeRequest, out);
             String handshakeResponse = in.readLine(); // Blocking receive call
             Document handshakeResponseJSON = Document.parse(handshakeResponse);
@@ -177,7 +177,7 @@ public class ConnectionHandler implements Runnable {
                         send(connectionRefused, out);
                     } else {
                         log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
-                        String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, port);
+                        String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
                         controller.addIncomingConnection(clientSocket);
                     }
