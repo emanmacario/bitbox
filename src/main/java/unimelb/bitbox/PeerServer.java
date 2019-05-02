@@ -45,8 +45,6 @@ public class PeerServer implements Runnable {
     public void run() {
 
         while (!closed) {
-            log.info("PeerServer Thread still running...");
-
             // Read any incoming request from the input buffer.
             // This blocks until an incoming message is received.
             String clientMessage = null;
@@ -82,22 +80,16 @@ public class PeerServer implements Runnable {
         String response;
         switch (command) {
             case "DIRECTORY_CREATE_REQUEST":
-                response = directoryCreateResponse(clientMsg);
-                send(response);
+                sendDirectoryCreateResponse(clientMsg);
                 break;
             case "DIRECTORY_DELETE_REQUEST":
-                response = directoryDeleteResponse(clientMsg);
-                send(response);
+                sendDirectoryDeleteResponse(clientMsg);
                 break;
             case "FILE_CREATE_REQUEST":
-                // This method sends FILE_BYTE_RESPONSE, and
-                // possibly FILE_BYTE_REQUEST messages inside it.
-                // TODO: Make all these methods consistent
                 sendFileCreateResponse(clientMsg);
                 break;
             case "FILE_DELETE_REQUEST":
-                response = fileDeleteResponse(clientMsg);
-                send(response);
+                sendFileDeleteResponse(clientMsg);
                 break;
             case "FILE_MODIFY_REQUEST":
                 sendFileModifyResponse(clientMsg);
@@ -124,129 +116,138 @@ public class PeerServer implements Runnable {
     }
 
     /**
-     * Get response to the client's request for creating a directory.
-     * @param request
-     * @return response
+     * Send a response to the client's request for creating a directory.
+     * @param request a directory create request in JSON
      */
-    private String directoryCreateResponse(Document request) {
-        String message;
-        String response;
+    private void sendDirectoryCreateResponse(Document request) throws IOException {
         String pathName = request.getString("pathName");
+        String message;
+        boolean status;
         if (fileSystemManager.fileNameExists(pathName)) {
             message = "pathname already exists";
-            response = Messages.getDirectoryCreateResponse(pathName, message, false);
+            status = false;
         } else if (!fileSystemManager.isSafePathName(pathName)) {
             message = "unsafe pathname given";
-            response = Messages.getDirectoryCreateResponse(pathName, message, false);
+            status = false;
         } else {
-            message = "directory created";
-            response = Messages.getDirectoryCreateResponse(pathName, message, true);
-            fileSystemManager.makeDirectory(pathName);
+            // Attempt to create the directory
+            status = fileSystemManager.makeDirectory(pathName);
+            message = status ? "directory created" : "there was a problem creating the directory";
         }
-        return response;
+        // Create and send response
+        String response = Messages.getDirectoryCreateResponse(pathName, message, status);
+        send(response);
     }
 
     /**
-     * Get response to the client's request for deleting a directory.
-     * @param request
-     * @return response
+     * Send a response to the client's request for deleting a directory.
+     * @param request the direct delete request
      */
-    private String directoryDeleteResponse(Document request) {
-        String message;
-        String response;
+    private void sendDirectoryDeleteResponse(Document request) throws IOException {
         String pathName = request.getString("pathName");
+        String message;
+        boolean status;
         if (!fileSystemManager.isSafePathName(pathName)) {
             message = "unsafe pathname given";
-            response = Messages.getDirectoryDeleteResponse(pathName, message, false);
+            status = false;
         } else if (!fileSystemManager.fileNameExists(pathName)) {
             message = "pathname does not exist";
-            response = Messages.getDirectoryDeleteResponse(pathName, message, false);
+            status = false;
         } else {
             // Attempt to delete the directory
-            boolean status = fileSystemManager.deleteDirectory(pathName);
+            status = fileSystemManager.deleteDirectory(pathName);
             message =  status ? "directory deleted" : "there was a problem deleting the directory";
-            response = Messages.getDirectoryDeleteResponse(pathName, message, status);
         }
-        return response;
+        String response = Messages.getDirectoryDeleteResponse(pathName, message, status);
+        send(response);
     }
 
+    /**
+     * Send a response to the client's request for creating a file.
+     * @param request a file create request in JSON
+     */
     private void sendFileCreateResponse(Document request) throws NoSuchAlgorithmException, IOException {
         String pathName = request.getString("pathName");
         Document fileDescriptor = (Document) request.get("fileDescriptor");
         String md5 = fileDescriptor.getString("md5");
-        Long lastModified = fileDescriptor.getLong("lastModified");
-        Long fileSize = fileDescriptor.getLong("fileSize");
-        /*
-        log.info("MD5 Hash: " + md5);
-        log.info("Last Modified: " + lastModified);
-        log.info("File Size: " + fileSize);
-         */
+        long lastModified = fileDescriptor.getLong("lastModified");
+        long fileSize = fileDescriptor.getLong("fileSize");
+
+        boolean debug = false;
+        if (debug) {
+            log.info("MD5 Hash: " + md5);
+            log.info("Last Modified: " + lastModified);
+            log.info("File Size: " + fileSize);
+        }
 
         // Validate the file create request and an appropriate response
-        String message;
-        String response;
-        if (!fileSystemManager.isSafePathName(pathName)) {
-            // Path name is unsafe
-            message = "unsafe pathname given";
-            response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, false);
-            send(response);
-        } else if (fileSystemManager.fileNameExists(pathName)) {
-            // File must not already exist
-            message = "pathname already exists";
-            response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, false);
-            send(response);
-        } else {
-            // Request was successful
-            message = "file loader ready";
-            response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, true);
-            // Create new file loader
-            boolean created = fileSystemManager.createFileLoader(pathName, md5, fileSize, lastModified);
-            if (!created) {
-                message = "there was a problem creating the file";
-                response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, false);
-            }
-            // TODO: Fix this sending logic
-            send(response);
-
-            // First, check if we can use a local copy. If
-            // not, start sending file bytes requests
-            if (!fileSystemManager.checkShortcut(pathName)) {
-                sendFileBytesRequests(pathName, md5, lastModified, fileSize);
-            }
-        }
-    }
-
-    private String fileDeleteResponse(Document request) {
-        String pathName = request.getString("pathName");
-        Document fileDescriptor = (Document) request.get("fileDescriptor");
-        String md5 = fileDescriptor.getString("md5");
-        Long lastModified = fileDescriptor.getLong("lastModified");
-        Long fileSize = fileDescriptor.getLong("fileSize");
-
         String message;
         boolean status;
         if (!fileSystemManager.isSafePathName(pathName)) {
             // Path name is unsafe
             message = "unsafe pathname given";
             status = false;
+        } else if (fileSystemManager.fileNameExists(pathName)) {
+            // File must not already exist
+            message = "pathname already exists";
+            status = false;
+        } else {
+            // Request was successful, try creating a file loader
+            status = fileSystemManager.createFileLoader(pathName, md5, fileSize, lastModified);
+            message = status ? "file loader ready" : "there was a problem creating the file";
+        }
+        // Send the response
+        String response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, status);
+        send(response);
+
+        // If file create request was successful
+        // then attempt to get the modified file
+        if (status) {
+            // Check if we can use a local copy
+            if (!fileSystemManager.checkShortcut(pathName)) {
+                // Otherwise, start requesting file bytes
+                sendFileBytesRequests(pathName, md5, lastModified, fileSize);
+            }
+        }
+    }
+
+    /**
+     * Send a response to the client's request for deleting a file.
+     * @param request a file delete request in JSON
+     */
+    private void sendFileDeleteResponse(Document request) throws IOException {
+        String pathName = request.getString("pathName");
+        Document fileDescriptor = (Document) request.get("fileDescriptor");
+        String md5 = fileDescriptor.getString("md5");
+        long lastModified = fileDescriptor.getLong("lastModified");
+        long fileSize = fileDescriptor.getLong("fileSize");
+
+        String message;
+        boolean status;
+        if (!fileSystemManager.isSafePathName(pathName)) {
+            message = "unsafe pathname given";
+            status = false;
         } else if (!fileSystemManager.fileNameExists(pathName, md5)) {
-            // File does not exist
             message = "pathname does not exist";
             status = false;
         } else {
-            // Attempt to delete the file
             status = fileSystemManager.deleteFile(pathName, lastModified, md5);
             message =  status ? "file deleted" : "there was a problem deleting the file";
         }
-        return Messages.getFileDeleteResponse(md5, lastModified, fileSize, pathName, message, status);
+        String response = Messages.getFileDeleteResponse(md5, lastModified, fileSize, pathName, message, status);
+        send(response);
     }
 
+    /**
+     * Send a response to the client's request for modifying a file.
+     * @param request a file modify request in JSON
+     */
     private void sendFileModifyResponse(Document request) throws NoSuchAlgorithmException, IOException {
         String pathName = request.getString("pathName");
         Document fileDescriptor = (Document) request.get("fileDescriptor");
         String md5 = fileDescriptor.getString("md5");
-        Long lastModified = fileDescriptor.getLong("lastModified");
-        Long fileSize = fileDescriptor.getLong("fileSize");
+        long lastModified = fileDescriptor.getLong("lastModified");
+        long fileSize = fileDescriptor.getLong("fileSize");
 
         String message;
         boolean status;
@@ -260,17 +261,9 @@ public class PeerServer implements Runnable {
             message = "file already exists with matching contents";
             status = false;
         } else {
-            // Request was successful
-            message = "file loader ready";
-            status = true;
-            // Create new file loader
-            boolean created = fileSystemManager.modifyFileLoader(pathName, md5, lastModified);
-            if (!created) {
-                message = "there was a problem modifying the file";
-                status = false;
-            }
+            status = fileSystemManager.modifyFileLoader(pathName, md5, lastModified);
+            message = status ? "file loader ready" : "there was a problem modifying the file";
         }
-
         // Send the response
         String response = Messages.getFileModifyResponse(md5, lastModified, fileSize, pathName, message, status);
         send(response);
@@ -278,14 +271,18 @@ public class PeerServer implements Runnable {
         // If file modify request was successful
         // then attempt to get the modified file
         if (status) {
-            // But first, check if we can use a local copy to avoid
-            // the other peer sending us a file we already have
+            // Check if we can use a local copy
             if (!fileSystemManager.checkShortcut(pathName)) {
+                // Otherwise, start requesting file bytes
                 sendFileBytesRequests(pathName, md5, lastModified, fileSize);
             }
         }
     }
 
+    /**
+     * Send a response to the client's request for file bytes.
+     * @param request a file bytes request in JSON
+     */
     private void sendFileBytesResponse(Document request) throws IOException, NoSuchAlgorithmException {
         String pathName = request.getString("pathName");
         Document fileDescriptor = (Document) request.get("fileDescriptor");
@@ -314,25 +311,22 @@ public class PeerServer implements Runnable {
             // Encode the file bytes in base 64
             byte[] encodedBuffer = Base64.getEncoder().encode(buffer.array());
             content = new String(encodedBuffer, StandardCharsets.UTF_8);
-            //log.info("Encoded 'content': " + content);
+            log.info("Encoded 'content': " + content);
         } else {
             content = "";
         }
         // Create and send response
-        String response
-                = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
+        String response = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
         send(response);
     }
 
-
+    /**
+     * Processes a server's file bytes response.
+     * @param response a file bytes response in JSON
+     */
     private void processFileBytesResponse(Document response) throws NoSuchAlgorithmException, IOException {
         String pathName = response.getString("pathName");
-        Document fileDescriptor = (Document) response.get("fileDescriptor");
-        String md5 = fileDescriptor.getString("md5");
-        Long lastModified = fileDescriptor.getLong("lastModified");
-        Long fileSize = fileDescriptor.getLong("fileSize");
-        Long position = response.getLong("position");
-        Long length = response.getLong("length");
+        long position = response.getLong("position");
         boolean status = response.getBoolean("status");
 
         if (!status) {
@@ -341,7 +335,7 @@ public class PeerServer implements Runnable {
             String content = response.getString("content");
             byte[] decodedBytes = Base64.getDecoder().decode(content);
             log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
-            ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes); // TODO: Check if this is correct
+            ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes);
 
             boolean success = fileSystemManager.writeFile(pathName, decodedByteBuffer, position);
             if (success) {
@@ -351,7 +345,6 @@ public class PeerServer implements Runnable {
             }
         }
     }
-
 
     /**
      * Sends all the file byte request messages
@@ -378,12 +371,9 @@ public class PeerServer implements Runnable {
         }
     }
 
-
-    private FileDescriptor getFileDescriptor(Document request) {
-        // TODO: Use this to avoid duplicate code
-        return null;
-    }
-
+    /**
+     * Stops this thread.
+     */
     public void close() {
         this.closed = true;
     }
