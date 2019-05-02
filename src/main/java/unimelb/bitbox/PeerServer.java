@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 public class PeerServer implements FileSystemObserver, Runnable {
     private static Logger log = Logger.getLogger(PeerServer.class.getName());
 
-    private FileSystemManager fileSystemManager;
+    private static FileSystemManager fileSystemManager;
     private BufferedReader in;
     private BufferedWriter out;
     private boolean closed;
@@ -30,7 +30,9 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @param out output buffer for connection
      */
     public PeerServer(BufferedReader in, BufferedWriter out) throws NoSuchAlgorithmException, IOException {
-        this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
+        if (fileSystemManager == null) {
+            fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
+        }
         this.in = in;
         this.out = out;
         this.closed = false;
