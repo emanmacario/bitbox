@@ -28,8 +28,7 @@ public class PeerConnectionController implements FileSystemObserver {
         this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"),this);
         this.connections = new ArrayList<>();
         this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
-        this.maximumIncomingConnections
-                = Integer.parseInt(Configuration.getConfigurationValue("maximumIncomingConnections"));
+        this.maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         this.currentIncomingConnections = 0;
         this.currentOutgoingConnections = 0;
         this.start();

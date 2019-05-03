@@ -29,7 +29,7 @@ public class Peer
 		//Server Setup, get Port and Advertised name from properties
 		String advertisedName = Configuration.getConfigurationValue("advertisedName");
 		int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
-		int maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncomingConnections"));
+		int maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
 
 
 		ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName);
