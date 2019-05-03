@@ -12,13 +12,16 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class PeerServer implements FileSystemObserver, Runnable {
     private static Logger log = Logger.getLogger(PeerServer.class.getName());
 
     private static FileSystemManager fileSystemManager;
+    private PeerClient client;
     private BufferedReader in;
     private BufferedWriter out;
     private boolean closed;
@@ -29,10 +32,11 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @param in input buffer for connection
      * @param out output buffer for connection
      */
-    public PeerServer(BufferedReader in, BufferedWriter out) throws NoSuchAlgorithmException, IOException {
+    public PeerServer(PeerClient client, BufferedReader in, BufferedWriter out) throws NoSuchAlgorithmException, IOException {
         if (fileSystemManager == null) {
             fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
         }
+        this.client = client;
         this.in = in;
         this.out = out;
         this.closed = false;
@@ -50,30 +54,31 @@ public class PeerServer implements FileSystemObserver, Runnable {
      */
     @Override
     public void run() {
+        // Read any incoming request from the input buffer.
+        // This blocks until an incoming message is received.
+        String clientMessage = null;
+        try {
+            while ((clientMessage = in.readLine()) != null) {
+                // Logging
+                log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMessage);
 
-        while (!closed) {
-            // Read any incoming request from the input buffer.
-            // This blocks until an incoming message is received.
-            String clientMessage = null;
-            try {
-                while ((clientMessage = in.readLine()) != null) {
-                    // Logging
-                    //log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMessage);
+                // Parse the request into a JSON object
+                Document json = Document.parse(clientMessage);
 
-                    // Parse the request into a JSON object
-                    Document json = Document.parse(clientMessage);
-
-                    // Handle the incoming request
-                    try {
-                        handleIncomingClientMessage(json);
-                    } catch (NoSuchAlgorithmException | IOException e) {
-                        e.printStackTrace();
-                    }
+                // Handle the incoming request
+                try {
+                    handleIncomingClientMessage(json);
+                } catch (NoSuchAlgorithmException | IOException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        log.warning("Socket to peer was closed, my PeerServer thread has stopped");
+
+        // Terminate the PeerClient thread
+        this.client.close();
     }
 
     /**
@@ -179,13 +184,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
         String md5 = fileDescriptor.getString("md5");
         long lastModified = fileDescriptor.getLong("lastModified");
         long fileSize = fileDescriptor.getLong("fileSize");
-
-        boolean debug = false;
-        if (debug) {
-            log.info("MD5 Hash: " + md5);
-            log.info("Last Modified: " + lastModified);
-            log.info("File Size: " + fileSize);
-        }
 
         // Validate the file create request and an appropriate response
         String message;
@@ -318,7 +316,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
             // Encode the file bytes in base 64
             byte[] encodedBuffer = Base64.getEncoder().encode(buffer.array());
             content = new String(encodedBuffer, StandardCharsets.UTF_8);
-            //log.info("Encoded 'content': " + content);
         } else {
             content = "";
         }
@@ -341,7 +338,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
         } else {
             String content = response.getString("content");
             byte[] decodedBytes = Base64.getDecoder().decode(content);
-            //log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
             ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes);
 
             boolean success = fileSystemManager.writeFile(pathName, decodedByteBuffer, position);
@@ -354,35 +350,32 @@ public class PeerServer implements FileSystemObserver, Runnable {
     }
 
     /**
-     * Sends all the file byte request messages
+     * Enqueues all the file byte request messages
      * for a given file 'pathName' and its
-     * size 'fileSize'.
+     * size 'fileSize' into the PeerClient outgoing
+     * messages queue.
      * @param pathName the path to the file
      * @param fileSize the size of the file
      */
-    private void sendFileBytesRequests(String pathName, String md5, long lastModified, long fileSize) throws IOException {
+    private void sendFileBytesRequests(String pathName, String md5, long lastModified, long fileSize) {
+        List<String> fileBytesRequests = new ArrayList<>();
         long position = 0;
         long length;
+        // Requests blocks of size 'blockSize' bytes
         for (int i = 0; i < fileSize / blockSize; i++) {
             length = blockSize;
             String fileBytesRequest =
                     Messages.getFileBytesRequest(md5, lastModified, fileSize, pathName, position, length);
-            send(fileBytesRequest);
+            fileBytesRequests.add(fileBytesRequest);
             position += blockSize;
         }
         // Request last block, which may be smaller than 'blockSize'
         if ((length = fileSize % blockSize) > 0) {
             String fileBytesRequest =
                     Messages.getFileBytesRequest(md5, lastModified, fileSize, pathName, position, length);
-            send(fileBytesRequest);
+            fileBytesRequests.add(fileBytesRequest);
         }
-    }
-
-    /**
-     * Stops this thread.
-     */
-    public void close() {
-        this.closed = true;
+        this.client.enqueue(fileBytesRequests);
     }
 
     /**
@@ -392,8 +385,10 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @throws IOException
      */
     private void send(String message) throws IOException {
+        Document doc = Document.parse(message);
+        String command = doc.getString("command");
         out.write(message + '\n');
         out.flush();
-        //log.info("Sending: " + message);
+        log.info("SENDING " + message);
     }
 }

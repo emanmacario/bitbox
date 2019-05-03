@@ -1,12 +1,12 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import java.util.logging.Logger;
 
@@ -14,13 +14,15 @@ public class PeerClient implements Runnable {
     private static Logger log = Logger.getLogger(PeerClient.class.getName());
 
     private Queue<FileSystemEvent> events;
+    private Queue<String> messages;
     private BufferedWriter out;
     private boolean closed;
 
-    // Thread constructor
+    // PeerClient constructor
     public PeerClient(BufferedWriter out) {
         this.out = out;
         this.events = new LinkedList<>();
+        this.messages = new LinkedList<>();
         this.closed = false;
     }
 
@@ -90,6 +92,10 @@ public class PeerClient implements Runnable {
         this.events.add(event);
     }
 
+    public void enqueue(List<String> messages) {
+        this.messages.addAll(messages);
+    }
+
     /**
      * Responsible for handling outgoing requests generated
      * by general file system events to a single connected peer,
@@ -104,7 +110,7 @@ public class PeerClient implements Runnable {
                 // Need to sleep to ensure file system events
                 // are actually processed. If we don't then
                 // for some reason they aren't processed.
-                Thread.sleep(100);
+                Thread.sleep(50);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -113,14 +119,27 @@ public class PeerClient implements Runnable {
             // as outgoing messages to connected peers
             FileSystemEvent event;
             try {
-                if ((event = this.events.poll()) != null) {
-                    log.info("PROCESSING NEW FILE SYSTEM EVENT");
+                while ((event = this.events.poll()) != null) {
                     handleOutgoingClientMessage(event);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+            // Process enqueued messages to be sent to the connected
+            // peer. These are typically FILE_BYTE_REQUEST messages,
+            // which allows the corresponding PeerServer thread to
+            // not block, by having to send out all requests in one go.
+            String message;
+            try {
+                if ((message = this.messages.poll()) != null) {
+                    send(message);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
+        log.warning("Socket to peer was closed, my PeerClient thread has stopped");
     }
 
     /**

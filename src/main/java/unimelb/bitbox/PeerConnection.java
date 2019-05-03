@@ -28,7 +28,7 @@ public class PeerConnection {
         BufferedWriter out
                 = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
         this.client = new PeerClient(out);
-        this.server = new PeerServer(in, out);
+        this.server = new PeerServer(this.client, in, out);
         this.start();
     }
 
@@ -40,15 +40,6 @@ public class PeerConnection {
         for (FileSystemEvent event : syncEvents) {
             client.enqueue(event);
         }
-    }
-
-    /**
-     * Stops PeerClient and PeerServer threads
-     * for this established connection.
-     */
-    public void close() {
-        this.client.close();
-        this.server.close();
     }
 
     /**
