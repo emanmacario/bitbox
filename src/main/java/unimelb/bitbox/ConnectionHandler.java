@@ -1,6 +1,7 @@
 package unimelb.bitbox;
 
 import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.HostPort;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -69,9 +70,9 @@ public class ConnectionHandler implements Runnable {
                 // Accept an incoming client connection request (blocking call)
                 Socket clientSocket = listeningSocket.accept();
                 BufferedReader in =
-                        new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+                        new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
                 BufferedWriter out =
-                        new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+                        new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
 
                 try {
                     String clientMessage = in.readLine(); // Blocking receive call
@@ -135,8 +136,9 @@ public class ConnectionHandler implements Runnable {
             case "CONNECTION_REFUSED":
                 ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
                 for (Document peer : peers) {
-                    port = peer.getInteger("port");
-                    host = peer.getString("host");
+                    HostPort hp = new HostPort(peer);
+                    port = hp.port;
+                    host = hp.host;
                     if (host != null && port != null) {
                         if (!controller.isPeerConnected(host, port)) {
                             connect(host, port);
