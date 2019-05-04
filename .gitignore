@@ -16,6 +16,5 @@ log/
 target/
 
 # BitBox
-*.jar
 share/
 peer*/
