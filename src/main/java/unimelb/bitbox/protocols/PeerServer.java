@@ -381,6 +381,16 @@ public class PeerServer implements FileSystemObserver, Runnable {
         List<String> fileBytesRequests = new ArrayList<>();
         long position = 0;
         long length;
+
+        // Special case: empty file
+        if (fileSize == 0) {
+            String fileBytesRequest =
+                    Messages.getFileBytesRequest(md5, lastModified, fileSize, pathName, 0, 0);
+            fileBytesRequests.add(fileBytesRequest);
+            this.client.enqueue(fileBytesRequests);
+            return;
+        }
+
         // Requests blocks of size 'blockSize' bytes
         for (int i = 0; i < fileSize / blockSize; i++) {
             length = blockSize;
