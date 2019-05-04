@@ -1,11 +1,9 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.logging.Logger;
@@ -13,22 +11,17 @@ import java.util.logging.Logger;
 public class PeerConnection {
     private static Logger log = Logger.getLogger(PeerConnection.class.getName());
 
-    private String clientHostName;
-    private Integer clientPort;
+    private String peerHost;
+    private Integer peerPort;
     private PeerClient client;
     private PeerServer server;
 
-    public PeerConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
-        this.clientHostName = clientSocket.getInetAddress().getHostName();
-        this.clientPort = clientSocket.getPort();
-        log.info("New connection to peer " + clientHostName + ":" + clientPort);
-
-        BufferedReader in
-                = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-        BufferedWriter out
-                = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
-        this.client = new PeerClient(out);
-        this.server = new PeerServer(this.client, in, out);
+    public PeerConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        log.info("Connection to " + host + ":" + port + " established");
+        this.peerHost = host;
+        this.peerPort = port;
+        this.client = new PeerClient(host, port, socket);
+        this.server = new PeerServer(this.client, host, port, socket);
         this.start();
     }
 
@@ -50,15 +43,15 @@ public class PeerConnection {
         Thread serverThread = new Thread(server);
         clientThread.start();
         serverThread.start();
-        log.info("PeerClient Thread running");
-        log.info("PeerServer Thread running");
+        log.info("PeerClient thread for " + peerHost + ":" + peerPort + " started");
+        log.info("PeerServer thread for " + peerHost + ":" + peerPort + " started");
     }
 
     public String getHost() {
-        return this.clientHostName;
+        return this.peerHost;
     }
 
     public int getPort() {
-        return this.clientPort;
+        return this.peerPort;
     }
 }

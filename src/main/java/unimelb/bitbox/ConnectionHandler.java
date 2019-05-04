@@ -47,6 +47,7 @@ public class ConnectionHandler implements Runnable {
             // Attempt to perform a handshake with the peer
             String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
             send(handshakeRequest, out);
+            log.info("sending to " + host + ":" + "port " + handshakeRequest);
             String handshakeResponse = in.readLine(); // Blocking receive call
             Document handshakeResponseJSON = Document.parse(handshakeResponse);
             try {
@@ -54,14 +55,10 @@ public class ConnectionHandler implements Runnable {
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
             }
-
-            log.info("Incoming response: " + handshakeResponse);
-
         } catch (IOException e) {
             log.warning("while connecting to " + host + ":" + port + " connection refused");
         }
     }
-
 
     @Override
     public void run() {
@@ -76,11 +73,9 @@ public class ConnectionHandler implements Runnable {
 
                 try {
                     String clientMessage = in.readLine(); // Blocking receive call
-                    log.info("Incoming request: " + clientMessage);
                     Document clientMessageJSON = Document.parse(clientMessage);
-
                     try {
-                        handleJSONClientMessage(clientMessageJSON, clientSocket, in, out);
+                        handleJSONClientMessage(clientMessageJSON, clientSocket, out);
                     } catch (IOException e) {
                         e.printStackTrace();
                     } catch (NoSuchAlgorithmException e) {
@@ -88,17 +83,16 @@ public class ConnectionHandler implements Runnable {
                     }
                 } catch (SocketException e) {
                     e.printStackTrace();
-                    log.warning("Client socket closed");
+                    log.warning("peer socket unexpectedly closed");
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-        }
-        finally {
+        } finally {
             if (listeningSocket != null) {
                 try {
-                    log.info("Server listening socket closed");
                     listeningSocket.close();
+                    log.info("server listening socket closed");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -106,34 +100,32 @@ public class ConnectionHandler implements Runnable {
         }
     }
 
-
     private void handleJSONServerMessage(Document json, Socket socket, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
+        Document hostPort = (Document) json.get("hostPort");
+        Integer port =  (int) hostPort.getLong("port");
+        String host = hostPort.getString("host");
         String invalidProtocol;
 
         switch (command) {
             case "HANDSHAKE_RESPONSE":
-                Document hostPort = (Document) json.get("hostPort");
-                Integer port =  (int) hostPort.getLong("port");
-                String host = hostPort.getString("host");
-
+                log.info("received command [" + command + "] from " + host + ":" + port);
                 // Check message credibility, ensure host and port field are not null
                 if (port != null && host != null) {
                     // Proofing if a peer accepted an existing connection
                     if (controller.isPeerConnected(host, port)) {
-                        invalidProtocol = Messages.getInvalidProtocol("Peer already connected!");
+                        invalidProtocol = Messages.getInvalidProtocol("peer already connected");
                         send(invalidProtocol, out);
+                        log.info("sending to " + host + ":" + "port " + invalidProtocol);
                     } else {
                         // Start threads for the outgoing connection
-                        controller.addOutgoingConnection(socket);
+                        controller.addOutgoingConnection(host, port, socket);
                     }
-                } else {
-                    invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
-                    send(invalidProtocol, out);
                 }
                 break;
 
             case "CONNECTION_REFUSED":
+                log.info("received command [" + command + "] from " + host + ":" + port);
                 ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
                 for (Document peer : peers) {
                     HostPort hp = new HostPort(peer);
@@ -143,21 +135,20 @@ public class ConnectionHandler implements Runnable {
                         if (!controller.isPeerConnected(host, port)) {
                             connect(host, port);
                         }
-                    } else {
-                        invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
-                        send(invalidProtocol, out);
                     }
                 }
                 break;
             default:
-                invalidProtocol = Messages.getInvalidProtocol("Expected HANDSHAKE_RESPONSE");
+                log.warning("received an invalid message from " + host + ":" + port);
+                invalidProtocol = Messages.getInvalidProtocol("expected HANDSHAKE_RESPONSE");
                 send(invalidProtocol, out);
+                log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                 break;
         }
     }
 
 
-    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedReader in,BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
         Integer port =  (int) hostPort.getLong("port");
@@ -165,35 +156,32 @@ public class ConnectionHandler implements Runnable {
 
         switch (command) {
             case "HANDSHAKE_REQUEST":
+                log.info("received command [" + command + "] from " + host + ":" + port);
                 // Check message credibility, ensure host field
                 String invalidProtocol;
                 if (host != null && port != null) {
                     if (controller.isPeerConnected(host, port)) {
-                        invalidProtocol = Messages.getInvalidProtocol("Peer already connected!");
-                        log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
+                        invalidProtocol = Messages.getInvalidProtocol("peer already connected");
                         send(invalidProtocol, out);
+                        log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                     } else if (!controller.canAcceptIncomingConnection()) {
                         Map<String, Integer> connectedPeers = controller.getConnectedPeers();
                         String connectionRefused = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
-                        log.info("Connection Refused between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + connectionRefused);
                         send(connectionRefused, out);
+                        log.info("sending to " + host + ":" + port + " " + connectionRefused);
                     } else {
-                        log.info("Connection established between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host );
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
-                        controller.addIncomingConnection(clientSocket);
+                        log.info("sending to " + host + ":" + port + " " + handShakeResponse);
+                        controller.addIncomingConnection(host, port, clientSocket);
                     }
-                } else {
-                    invalidProtocol = Messages.getInvalidProtocol("message must contain hostPort field");
-                    log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
-                    send(invalidProtocol, out);
                 }
                 break;
 
             default:
                 invalidProtocol = Messages.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
-                log.info("Invalid message between port: "+ this.port + " @ host: "+ this.advertisedHost +" and port: " + port +" @ host: " + host + invalidProtocol);
                 send(invalidProtocol, out);
+                log.info("sending to " + host + ":" + port + " " + invalidProtocol);
         }
     }
 
@@ -206,6 +194,5 @@ public class ConnectionHandler implements Runnable {
     private void send(String message, BufferedWriter out) throws IOException {
         out.write(message + '\n');
         out.flush();
-        log.info("Sending: " + message);
     }
 }

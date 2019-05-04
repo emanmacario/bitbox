@@ -19,10 +19,8 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     private FileSystemManager fileSystemManager;
     private List<PeerConnection> connections;
     private int syncInterval;
-
     private int maximumIncomingConnections;
     private int currentIncomingConnections;
-    private int currentOutgoingConnections;
 
     public PeerConnectionController() throws NoSuchAlgorithmException, IOException {
         this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"),this);
@@ -30,22 +28,20 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
         this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
         this.maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         this.currentIncomingConnections = 0;
-        this.currentOutgoingConnections = 0;
         this.start();
     }
 
-    public void addIncomingConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
-        addConnection(clientSocket);
+    public void addIncomingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket);
         this.currentIncomingConnections += 1;
     }
 
-    public void addOutgoingConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
-        addConnection(clientSocket);
-        this.currentOutgoingConnections += 1;
+    public void addOutgoingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket);
     }
 
-    private void addConnection(Socket clientSocket) throws IOException, NoSuchAlgorithmException {
-        PeerConnection connection = new PeerConnection(clientSocket);
+    private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        PeerConnection connection = new PeerConnection(host, port, socket);
         this.connections.add(connection);
     }
 

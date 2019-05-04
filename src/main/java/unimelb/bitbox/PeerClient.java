@@ -5,6 +5,9 @@ import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -13,16 +16,20 @@ import java.util.logging.Logger;
 public class PeerClient implements Runnable {
     private static Logger log = Logger.getLogger(PeerClient.class.getName());
 
+    private String host;
+    private int port;
     private Queue<FileSystemEvent> events;
     private Queue<String> messages;
     private BufferedWriter out;
     private boolean closed;
 
     // PeerClient constructor
-    public PeerClient(BufferedWriter out) {
-        this.out = out;
+    public PeerClient(String host, int port, Socket socket) throws IOException {
+        this.host = host;
+        this.port = port;
         this.events = new LinkedList<>();
         this.messages = new LinkedList<>();
+        this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.closed = false;
     }
 
@@ -88,7 +95,6 @@ public class PeerClient implements Runnable {
     }
 
     public void enqueue(FileSystemEvent event) {
-        log.info(event.event.name() + " added to PeerClient queue");
         this.events.add(event);
     }
 
@@ -139,7 +145,7 @@ public class PeerClient implements Runnable {
                 e.printStackTrace();
             }
         }
-        log.warning("Socket to peer was closed, my PeerClient thread has stopped");
+        log.info("Connection to " + host + ":" + port + " has been terminated, PeerClient thread has stopped");
     }
 
     /**
@@ -150,7 +156,7 @@ public class PeerClient implements Runnable {
      */
     private void send(String message) throws IOException {
         out.write(message + '\n');
+        log.info("sending to " + host + ":" + port + " " + message);
         out.flush();
-        log.info("Sending: " + message);
     }
 }
