@@ -1,5 +1,7 @@
-package unimelb.bitbox;
+package unimelb.bitbox.connection;
 
+import unimelb.bitbox.util.Messages;
+import unimelb.bitbox.controller.PeerConnectionController;
 import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.HostPort;
 

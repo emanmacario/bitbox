@@ -1,7 +1,8 @@
-package unimelb.bitbox;
+package unimelb.bitbox.protocols;
 
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
+import unimelb.bitbox.util.Messages;
 
 import java.io.BufferedWriter;
 import java.io.IOException;

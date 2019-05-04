@@ -1,5 +1,7 @@
-package unimelb.bitbox;
+package unimelb.bitbox.controller;
 
+import unimelb.bitbox.Peer;
+import unimelb.bitbox.connection.ConnectionObserver;
 import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
@@ -18,7 +20,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     private static Logger log = Logger.getLogger(PeerConnectionController.class.getName());
 
     private FileSystemManager fileSystemManager;
-    private List<PeerConnection> connections;
+    private List<Peer> connections;
     private List<HostPort> incomingConnections;
     private int syncInterval;
     private int maximumIncomingConnections;
@@ -45,14 +47,14 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     }
 
     private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        PeerConnection connection = new PeerConnection(host, port, socket, this);
+        Peer connection = new Peer(host, port, socket, this);
         this.connections.add(connection);
     }
 
     @Override
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
         // Enqueue the file system event in every client thread
-        for (PeerConnection pc : this.connections) {
+        for (Peer pc : this.connections) {
             pc.onNewFileSystemEvent(fileSystemEvent);
         }
     }
@@ -65,7 +67,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
      * @return true or false
      */
     public boolean isPeerConnected(String host, int port) {
-        for (PeerConnection pc : connections) {
+        for (Peer pc : connections) {
             if (host.equals(pc.getHost()) && port == pc.getPort()) {
                 return true;
             }
@@ -87,7 +89,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
      */
     public Map<String, Integer> getConnectedPeers() {
         Map<String, Integer> connectedPeers = new HashMap<>();
-        for (PeerConnection pc : this.connections) {
+        for (Peer pc : this.connections) {
             String host = pc.getHost();
             Integer port = pc.getPort();
             connectedPeers.put(host, port);
@@ -116,9 +118,8 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
      */
     private void relaySyncEvents() {
         List<FileSystemEvent> syncEvents = fileSystemManager.generateSyncEvents();
-        log.info("Generating sync events, PeerConnection list size: " + connections.size());
-        log.info("Size of syncEvents: " + syncEvents.size());
-        for (PeerConnection pc : connections) {
+        log.info("generating sync events: " + syncEvents.size() + " events created");
+        for (Peer pc : connections) {
             if (pc != null) {
                 pc.onNewSyncEvents(syncEvents);
             }
@@ -136,8 +137,8 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     @Override
     public void disconnect(String host, int port) {
         // Update current peers connections list
-        List<PeerConnection> disconnections = new ArrayList<>();
-        for (PeerConnection pc : connections) {
+        List<Peer> disconnections = new ArrayList<>();
+        for (Peer pc : connections) {
             if (host.equals(pc.getHost()) && port == pc.getPort()) {
                 disconnections.add(pc);
             }

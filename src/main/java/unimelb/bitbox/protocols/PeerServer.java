@@ -1,10 +1,8 @@
-package unimelb.bitbox;
+package unimelb.bitbox.protocols;
 
-import unimelb.bitbox.util.Configuration;
-import unimelb.bitbox.util.Document;
-import unimelb.bitbox.util.FileSystemManager;
+import unimelb.bitbox.connection.ConnectionObserver;
+import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
-import unimelb.bitbox.util.FileSystemObserver;
 
 import java.io.*;
 import java.net.Socket;
