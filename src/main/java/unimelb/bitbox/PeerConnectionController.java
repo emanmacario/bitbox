@@ -4,6 +4,7 @@ import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 import unimelb.bitbox.util.FileSystemObserver;
+import unimelb.bitbox.util.HostPort;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -18,6 +19,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
 
     private FileSystemManager fileSystemManager;
     private List<PeerConnection> connections;
+    private List<HostPort> incomingConnections;
     private int syncInterval;
     private int maximumIncomingConnections;
     private int currentIncomingConnections;
@@ -25,6 +27,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     public PeerConnectionController() throws NoSuchAlgorithmException, IOException {
         this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"),this);
         this.connections = new ArrayList<>();
+        this.incomingConnections = new ArrayList<>();
         this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
         this.maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         this.currentIncomingConnections = 0;
@@ -33,6 +36,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
 
     public void addIncomingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
         addConnection(host, port, socket);
+        this.incomingConnections.add(new HostPort(host, port));
         this.currentIncomingConnections += 1;
     }
 
@@ -41,7 +45,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     }
 
     private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        PeerConnection connection = new PeerConnection(host, port, socket);
+        PeerConnection connection = new PeerConnection(host, port, socket, this);
         this.connections.add(connection);
     }
 
@@ -125,12 +129,30 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     /**
      * Updates the current list of peer connections
      * to signify that a peer given by 'host' and 'port'
-     * has disconnected from the socket.
+     * has disconnected from the peer socket.
      * @param host the peer host name
      * @param port the peer port number
      */
     @Override
     public void disconnect(String host, int port) {
+        // Update current peers connections list
+        List<PeerConnection> disconnections = new ArrayList<>();
+        for (PeerConnection pc : connections) {
+            if (host.equals(pc.getHost()) && port == pc.getPort()) {
+                disconnections.add(pc);
+            }
+        }
+        connections.removeAll(disconnections);
 
+        // Update maximum incoming connections if-and-only-if the
+        // connection for the peer that disconnected was incoming
+        List<HostPort> incomingDisconnections = new ArrayList<>();
+        for (HostPort hp : incomingConnections) {
+            if (host.equals(hp.host) && port == hp.port) {
+                incomingDisconnections.add(hp);
+                currentIncomingConnections -= 1;
+            }
+        }
+        incomingConnections.removeAll(incomingDisconnections);
     }
 }

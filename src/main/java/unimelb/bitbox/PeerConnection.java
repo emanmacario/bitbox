@@ -16,12 +16,12 @@ public class PeerConnection {
     private PeerClient client;
     private PeerServer server;
 
-    public PeerConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+    public PeerConnection(String host, int port, Socket socket, ConnectionObserver observer) throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
         this.peerHost = host;
         this.peerPort = port;
         this.client = new PeerClient(host, port, socket);
-        this.server = new PeerServer(this.client, host, port, socket);
+        this.server = new PeerServer(this.client, host, port, socket, observer);
         this.start();
     }
 

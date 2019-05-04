@@ -21,6 +21,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
 
     private static FileSystemManager fileSystemManager;
     private PeerClient client;
+    private ConnectionObserver observer;
     private String host;
     private int port;
     private BufferedReader in;
@@ -36,7 +37,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @throws NoSuchAlgorithmException
      * @throws IOException
      */
-    public PeerServer(PeerClient client, String host, int port, Socket socket) throws NoSuchAlgorithmException, IOException {
+    public PeerServer(PeerClient client, String host, int port, Socket socket, ConnectionObserver observer)
+            throws NoSuchAlgorithmException, IOException {
         if (fileSystemManager == null) {
             fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
         }
@@ -45,6 +47,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
         this.port = port;
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        this.observer = observer;
         this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
     }
 
@@ -77,6 +80,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        observer.disconnect(host, port);
         log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
 
         // Terminate the PeerClient thread as well
