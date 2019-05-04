@@ -1,41 +1,51 @@
-package unimelb.bitbox;
+package unimelb.bitbox.protocols;
 
-import unimelb.bitbox.util.Configuration;
-import unimelb.bitbox.util.Document;
-import unimelb.bitbox.util.FileSystemManager;
+import unimelb.bitbox.connection.ConnectionObserver;
+import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
-import unimelb.bitbox.util.FileSystemObserver;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
+import java.io.*;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class PeerServer implements FileSystemObserver, Runnable {
     private static Logger log = Logger.getLogger(PeerServer.class.getName());
 
     private static FileSystemManager fileSystemManager;
+    private PeerClient client;
+    private ConnectionObserver observer;
+    private String host;
+    private int port;
     private BufferedReader in;
     private BufferedWriter out;
-    private boolean closed;
     private long blockSize;
 
     /**
      * PeerServer constructor
-     * @param in input buffer for connection
-     * @param out output buffer for connection
+     * @param client the corresponding peer client thread object
+     * @param host the peer host name
+     * @param port the peer port number
+     * @param socket the peer socket
+     * @throws NoSuchAlgorithmException
+     * @throws IOException
      */
-    public PeerServer(BufferedReader in, BufferedWriter out) throws NoSuchAlgorithmException, IOException {
+    public PeerServer(PeerClient client, String host, int port, Socket socket, ConnectionObserver observer)
+            throws NoSuchAlgorithmException, IOException {
         if (fileSystemManager == null) {
             fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
         }
-        this.in = in;
-        this.out = out;
-        this.closed = false;
+        this.client = client;
+        this.host = host;
+        this.port = port;
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+        this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        this.observer = observer;
         this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
     }
 
@@ -50,69 +60,76 @@ public class PeerServer implements FileSystemObserver, Runnable {
      */
     @Override
     public void run() {
+        // Read any incoming request from the input buffer.
+        // This blocks until an incoming message is received.
+        String clientMessage;
+        try {
+            while ((clientMessage = in.readLine()) != null) {
+                // Parse the request into a JSON object
+                Document clientMessageJSON = Document.parse(clientMessage);
 
-        while (!closed) {
-            // Read any incoming request from the input buffer.
-            // This blocks until an incoming message is received.
-            String clientMessage = null;
-            try {
-                while ((clientMessage = in.readLine()) != null) {
-                    // Logging
-                    //log.info("INCOMING " + Thread.currentThread().getName() + ": " + clientMessage);
-
-                    // Parse the request into a JSON object
-                    Document json = Document.parse(clientMessage);
-
-                    // Handle the incoming request
-                    try {
-                        handleIncomingClientMessage(json);
-                    } catch (NoSuchAlgorithmException | IOException e) {
-                        e.printStackTrace();
-                    }
+                // Handle the incoming request
+                try {
+                    handleIncomingClientMessage(clientMessageJSON);
+                } catch (NoSuchAlgorithmException | IOException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        observer.disconnect(host, port);
+        log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
+
+        // Terminate the PeerClient thread as well
+        this.client.close();
     }
 
     /**
      * Handles an incoming client message, sends a response.
-     * @param clientMsg incoming client message in JSON
+     * @param clientMessage incoming client message in JSON
      * @throws NoSuchAlgorithmException
      * @throws IOException
      */
-    private void handleIncomingClientMessage(Document clientMsg) throws NoSuchAlgorithmException, IOException {
-        String command = clientMsg.getString("command");
+    private void handleIncomingClientMessage(Document clientMessage) throws NoSuchAlgorithmException, IOException {
+        String command = clientMessage.getString("command");
         String response;
         switch (command) {
             case "DIRECTORY_CREATE_REQUEST":
-                sendDirectoryCreateResponse(clientMsg);
+                sendDirectoryCreateResponse(clientMessage);
                 break;
             case "DIRECTORY_DELETE_REQUEST":
-                sendDirectoryDeleteResponse(clientMsg);
+                sendDirectoryDeleteResponse(clientMessage);
                 break;
             case "FILE_CREATE_REQUEST":
-                sendFileCreateResponse(clientMsg);
+                sendFileCreateResponse(clientMessage);
                 break;
             case "FILE_DELETE_REQUEST":
-                sendFileDeleteResponse(clientMsg);
+                sendFileDeleteResponse(clientMessage);
                 break;
             case "FILE_MODIFY_REQUEST":
-                sendFileModifyResponse(clientMsg);
+                sendFileModifyResponse(clientMessage);
                 break;
             case "FILE_BYTES_REQUEST":
-                sendFileBytesResponse(clientMsg);
+                sendFileBytesResponse(clientMessage);
                 break;
             case "DIRECTORY_CREATE_RESPONSE":
+                processDirectoryCreateResponse(clientMessage);
+                break;
             case "DIRECTORY_DELETE_RESPONSE":
+                processDirectoryDeleteResponse(clientMessage);
+                break;
             case "FILE_CREATE_RESPONSE":
+                processFileCreateResponse(clientMessage);
+                break;
             case "FILE_DELETE_RESPONSE":
+                processFileDeleteResponse(clientMessage);
+                break;
             case "FILE_MODIFY_RESPONSE":
-                log.info("No implementation yet for " + command);
+                processFileModifyResponse(clientMessage);
                 break;
             case "FILE_BYTES_RESPONSE":
-                processFileBytesResponse(clientMsg);
+                processFileBytesResponse(clientMessage);
                 break;
             default:
                 // Invalid protocol
@@ -179,13 +196,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
         String md5 = fileDescriptor.getString("md5");
         long lastModified = fileDescriptor.getLong("lastModified");
         long fileSize = fileDescriptor.getLong("fileSize");
-
-        boolean debug = false;
-        if (debug) {
-            log.info("MD5 Hash: " + md5);
-            log.info("Last Modified: " + lastModified);
-            log.info("File Size: " + fileSize);
-        }
 
         // Validate the file create request and an appropriate response
         String message;
@@ -318,7 +328,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
             // Encode the file bytes in base 64
             byte[] encodedBuffer = Base64.getEncoder().encode(buffer.array());
             content = new String(encodedBuffer, StandardCharsets.UTF_8);
-            //log.info("Encoded 'content': " + content);
         } else {
             content = "";
         }
@@ -332,57 +341,121 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @param response a file bytes response in JSON
      */
     private void processFileBytesResponse(Document response) throws NoSuchAlgorithmException, IOException {
+        String command = response.getString("command");
         String pathName = response.getString("pathName");
         long position = response.getLong("position");
         boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
 
         if (!status) {
             fileSystemManager.cancelFileLoader(pathName);
+            log.warning("failed to receive remote file " + pathName);
         } else {
             String content = response.getString("content");
             byte[] decodedBytes = Base64.getDecoder().decode(content);
-            //log.info("Decoded content string: " + new String(decodedBytes, StandardCharsets.UTF_8));
             ByteBuffer decodedByteBuffer = ByteBuffer.wrap(decodedBytes);
 
             boolean success = fileSystemManager.writeFile(pathName, decodedByteBuffer, position);
             if (success) {
                 fileSystemManager.checkWriteComplete(pathName);
             } else {
-                log.warning("Failed to write to file");
+                log.warning("failed to write to file " + pathName);
+                return;
             }
+            log.info(command + " " + message);
         }
     }
 
     /**
-     * Sends all the file byte request messages
-     * for a given file 'pathName' and its
-     * size 'fileSize'.
+     * Enqueues all the file byte request messages for a given file 'pathName'
+     * and its size 'fileSize' into the PeerClient outgoing messages queue. Note
+     * that this method does not actually send any file bytes requests itself.
      * @param pathName the path to the file
+     * @param md5 the MD5 hash of the file
+     * @param fileSize the size of the file
+     * @param lastModified the last modified time of the file
      * @param fileSize the size of the file
      */
-    private void sendFileBytesRequests(String pathName, String md5, long lastModified, long fileSize) throws IOException {
+    private void sendFileBytesRequests(String pathName, String md5, long lastModified, long fileSize) {
+        List<String> fileBytesRequests = new ArrayList<>();
         long position = 0;
         long length;
+        // Requests blocks of size 'blockSize' bytes
         for (int i = 0; i < fileSize / blockSize; i++) {
             length = blockSize;
             String fileBytesRequest =
                     Messages.getFileBytesRequest(md5, lastModified, fileSize, pathName, position, length);
-            send(fileBytesRequest);
+            fileBytesRequests.add(fileBytesRequest);
             position += blockSize;
         }
         // Request last block, which may be smaller than 'blockSize'
         if ((length = fileSize % blockSize) > 0) {
             String fileBytesRequest =
                     Messages.getFileBytesRequest(md5, lastModified, fileSize, pathName, position, length);
-            send(fileBytesRequest);
+            fileBytesRequests.add(fileBytesRequest);
+        }
+        this.client.enqueue(fileBytesRequests);
+    }
+
+    private void processDirectoryCreateResponse(Document response) {
+        String command = response.getString("command");
+        boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
+        if (status) {
+            log.info(command + " " + message);
+        } else {
+            log.warning(command + " " + message);
         }
     }
 
-    /**
-     * Stops this thread.
-     */
-    public void close() {
-        this.closed = true;
+    private void processDirectoryDeleteResponse(Document response) {
+        String command = response.getString("command");
+        boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
+        if (status) {
+            log.info(command + " " + message);
+        } else {
+            log.warning(command + " " + message);
+        }
+    }
+
+    private void processFileCreateResponse(Document response) {
+        String command = response.getString("command");
+        boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
+        if (status) {
+            log.info(command + " " + message);
+        } else {
+            log.warning(command + " " + message);
+        }
+    }
+
+    private void processFileDeleteResponse(Document response) {
+        String command = response.getString("command");
+        boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
+        if (status) {
+            log.info(command + " " + message);
+        } else {
+            log.warning(command + " " + message);
+        }
+    }
+
+    private void processFileModifyResponse(Document response) {
+        String command = response.getString("command");
+        boolean status = response.getBoolean("status");
+        String message = response.getString("message");
+        log.info("received [" + command + "] from " + host +  ":" + port);
+        if (status) {
+            log.info(command + " " + message);
+        } else {
+            log.warning(command + " " + message);
+        }
     }
 
     /**
@@ -393,7 +466,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
      */
     private void send(String message) throws IOException {
         out.write(message + '\n');
+        log.info("sending to " + host + ":" + port + " " + message);
         out.flush();
-        //log.info("Sending: " + message);
     }
 }
