@@ -35,11 +35,11 @@ import java.util.logging.Logger;
  * The file system manager also provides an API
  * for safely making modifications to the files and directories in the share directory:
  * <li>{@link #cancelFileLoader(String)}</li>
- * <li>{@link #createFileLoader(String, String)}</li>
+ * <li>{@link # createFileLoader(String, String)}</li>
  * <li>{@link #checkShortcut(String)}</li>
  * <li>{@link #checkWriteComplete(String)}</li>
  * <li>{@link #deleteDirectory(String)}</li>
- * <li>{@link #deleteFile(String, long)}</li>
+ * <li>{@link # deleteFile(String, long)}</li>
  * <li>{@link #dirNameExists(String)}</li>
  * <li>{@link #fileNameExists(String)}</li>
  * <li>{@link #fileNameExists(String, String)}</li>
@@ -195,7 +195,7 @@ public class FileSystemManager extends Thread {
 		}
 
 		/**
-		 * Provide the {@link #Document} for this object.
+		 * Provide the {@link # Document} for this object.
 		 */
 		public Document toDoc() {
 			Document doc = new Document();
@@ -534,7 +534,7 @@ public class FileSystemManager extends Thread {
 	/**
 	 * Called to create a file loader in the case when a file name already exists. The existing
 	 * file must have a last modified timestamp that is less than or equal to the supplied one. See
-	 * {@link #createFileLoader(String, String)} for more details about the file loader.
+	 * {@link # createFileLoader(String, String)} for more details about the file loader.
 	 * @param pathName The name of the file to modify.
 	 * @param md5 The MD5 hash of the content that the loaded file <i>must</i> have in order
 	 * for the loading to complete.

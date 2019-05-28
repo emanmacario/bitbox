@@ -180,6 +180,7 @@ public class ConnectionHandler implements Runnable {
 
         switch (command) {
             case "HANDSHAKE_RESPONSE":
+                System.out.print("handshake response");
                 log.info("received command [" + command + "] from " + host + ":" + port);
                 // Check message credibility, ensure host and port field are not null
                 if (port != null && host != null) {
@@ -188,6 +189,7 @@ public class ConnectionHandler implements Runnable {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
                         if (mode == "tcp") {send(invalidProtocol, out); };
                         if (mode == "udp") {
+                            System.out.print("here2");
                             sendBytes = invalidProtocol.getBytes();
                             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                             socketUDP.send(sendPacket);
@@ -245,6 +247,7 @@ public class ConnectionHandler implements Runnable {
 
         switch (command) {
             case "HANDSHAKE_REQUEST":
+                System.out.print("handshake request");
                 log.info("received command [" + command + "] from " + host + ":" + port);
                 // Check message credibility, ensure host field
                 String invalidProtocol;
@@ -261,12 +264,25 @@ public class ConnectionHandler implements Runnable {
                     } else if (!controller.canAcceptIncomingConnection()) {
                         Map<String, Integer> connectedPeers = controller.getConnectedPeers();
                         String connectionRefused = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
-                        send(connectionRefused, out);
-                        log.info("sending to " + host + ":" + port + " " + connectionRefused);
+                        if (mode == "tcp") { send(connectionRefused, out); };
+                        if (mode == "udp") {
+                            sendBytes = connectionRefused.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            clientSocketUDP.send(sendPacket);
+                        }
+                            log.info("sending to " + host + ":" + port + " " + connectionRefused);
                     } else {
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
-                        log.info("sending to " + host + ":" + port + " " + handShakeResponse);
+                        if (mode == "tcp") { send(handShakeResponse, out); };
+                        if (mode == "udp") {
+                            System.out.print("here2");
+                            sendBytes = handShakeResponse.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            clientSocketUDP.send(sendPacket);
+                        }
+
+                                log.info("sending to " + host + ":" + port + " " + handShakeResponse);
                         controller.addIncomingConnection(host, port, clientSocket, mode, clientSocketUDP);
                     }
                 }
@@ -274,7 +290,12 @@ public class ConnectionHandler implements Runnable {
 
             default:
                 invalidProtocol = Messages.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
-                send(invalidProtocol, out);
+                if (mode == "tcp") { send(invalidProtocol, out); };
+                if (mode == "udp") {
+                    sendBytes = invalidProtocol.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                    clientSocketUDP.send(sendPacket);
+                }
                 log.info("sending to " + host + ":" + port + " " + invalidProtocol);
         }
     }
