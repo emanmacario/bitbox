@@ -9,6 +9,7 @@ import unimelb.bitbox.util.FileSystemObserver;
 import unimelb.bitbox.util.HostPort;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -36,18 +37,18 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
         this.start();
     }
 
-    public void addIncomingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        addConnection(host, port, socket);
+    public void addIncomingConnection(String host, int port, Socket socket, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket, mode, socketUDP);
         this.incomingConnections.add(new HostPort(host, port));
         this.currentIncomingConnections += 1;
     }
 
-    public void addOutgoingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        addConnection(host, port, socket);
+    public void addOutgoingConnection(String host, int port, Socket socket, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket, mode, socketUDP);
     }
 
-    private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        Peer connection = new Peer(host, port, socket, this);
+    private void addConnection(String host, int port, Socket socket, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
+        Peer connection = new Peer(host, port, socket, this, mode, socketUDP);
         this.connections.add(connection);
     }
 

@@ -6,9 +6,7 @@ import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.HostPort;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -22,11 +20,13 @@ public class ConnectionHandler implements Runnable {
     private String advertisedHost;
     private ServerSocket listeningSocket;
     private PeerConnectionController controller;
+    private String mode;
 
-    public ConnectionHandler(int port, String advertisedHost) throws IOException, NoSuchAlgorithmException {
+    public ConnectionHandler(int port, String advertisedHost, String mode) throws IOException, NoSuchAlgorithmException {
         this.port = port;
         this.advertisedHost = advertisedHost;
         this.listeningSocket = new ServerSocket(port);
+        this.mode = mode;
         this.controller = new PeerConnectionController();
     }
 
@@ -37,77 +37,146 @@ public class ConnectionHandler implements Runnable {
      * @param host the host name of the peer
      * @param port the port number of the peer
      */
-    public void connect(String host, int port) {
-        try {
-            // Create client socket, get input and output buffers
-            Socket clientSocket = new Socket(host, port);
-            BufferedReader in =
-                    new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-            BufferedWriter out =
-                    new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
-
-            // Attempt to perform a handshake with the peer
-            String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
-            send(handshakeRequest, out);
-            log.info("sending to " + host + ":" + "port " + handshakeRequest);
-            String handshakeResponse = in.readLine(); // Blocking receive call
-            Document handshakeResponseJSON = Document.parse(handshakeResponse);
+    public void connect(String host, int port, String mode) {
+        if (mode == "tcp") {
             try {
-                handleJSONServerMessage(handshakeResponseJSON, clientSocket, out);
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-            }
-        } catch (IOException e) {
-            log.warning("while connecting to " + host + ":" + port + " connection refused");
-        }
-    }
-
-    @Override
-    public void run() {
-        try {
-            while (true) {
-                // Accept an incoming client connection request (blocking call)
-                Socket clientSocket = listeningSocket.accept();
+                // Create client socket, get input and output buffers
+                Socket clientSocket = new Socket(host, port);
                 BufferedReader in =
                         new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
                 BufferedWriter out =
                         new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
 
+                // Attempt to perform a handshake with the peer
+                String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
+                send(handshakeRequest, out);
+                log.info("sending to " + host + ":" + "port " + handshakeRequest);
+                String handshakeResponse = in.readLine(); // Blocking receive call
+                Document handshakeResponseJSON = Document.parse(handshakeResponse);
                 try {
-                    String clientMessage = in.readLine(); // Blocking receive call
+                    handleJSONServerMessage(handshakeResponseJSON, clientSocket, out, "tcp", null);
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                }
+            } catch (IOException e) {
+                log.warning("while connecting to " + host + ":" + port + " connection refused");
+            }
+        }
+        else if (mode == "udp") {
+            try {
+                // Create client socket, get input and output buffers
+                DatagramSocket clientSocketUDP = new DatagramSocket(port);
+                byte[] sendHandshake = new byte[8192];
+                byte[] receiveData = new byte[8192];
+
+                InetAddress IPAddress = InetAddress.getByName(host);
+
+                // Attempt to perform a handshake with the peer
+                String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
+                sendHandshake = handshakeRequest.getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(sendHandshake, sendHandshake.length, IPAddress, port);
+                clientSocketUDP.send(sendPacket);
+                log.info("sending to " + host + ":" + "port " + handshakeRequest);
+
+                DatagramPacket in = new DatagramPacket(receiveData, receiveData.length);
+                clientSocketUDP.receive(in);
+                byte[] data = in.getData();
+                String handshakeResponse = new String(data, 0, data.length);
+                Document handshakeResponseJSON = Document.parse(handshakeResponse);
+                try {
+                    handleJSONServerMessage(handshakeResponseJSON, null, null, "udp", clientSocketUDP); // this needs to be changed
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                }
+            } catch (IOException e) {
+                log.warning("while connecting to " + host + ":" + port + " connection refused");
+            }
+        }
+    }
+    @Override
+    public void run() {
+        if (mode == "tcp") {
+            try {
+                while (true) {
+                    // Accept an incoming client connection request (blocking call)
+                    Socket clientSocket = listeningSocket.accept();
+                    BufferedReader in =
+                            new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                    BufferedWriter out =
+                            new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
+
+                    try {
+                        String clientMessage = in.readLine(); // Blocking receive call
+                        Document clientMessageJSON = Document.parse(clientMessage);
+                        try {
+                            handleJSONClientMessage(clientMessageJSON, clientSocket, out, "tcp", null);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (NoSuchAlgorithmException e) {
+                            e.printStackTrace();
+                        }
+                    } catch (SocketException e) {
+                        e.printStackTrace();
+                        log.warning("peer socket unexpectedly closed");
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (listeningSocket != null) {
+                    try {
+                        listeningSocket.close();
+                        log.info("server listening socket closed");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } else if (mode == "udp") {
+            try {
+                while (true) {
+                    // Accept an incoming client connection request (blocking call)
+                    byte[] buffer = new byte[8192];
+                    DatagramSocket clientSocketUDP = new DatagramSocket(port);
+
+                    DatagramPacket in = new DatagramPacket(buffer, buffer.length);
+                    clientSocketUDP.receive(in);
+
+                    byte[] data = in.getData();
+                    String clientMessage = new String(data, 0, data.length);
                     Document clientMessageJSON = Document.parse(clientMessage);
                     try {
-                        handleJSONClientMessage(clientMessageJSON, clientSocket, out);
+                        handleJSONClientMessage(clientMessageJSON, null, null, "udp", clientSocketUDP);
                     } catch (IOException e) {
                         e.printStackTrace();
                     } catch (NoSuchAlgorithmException e) {
                         e.printStackTrace();
                     }
-                } catch (SocketException e) {
-                    e.printStackTrace();
-                    log.warning("peer socket unexpectedly closed");
                 }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (listeningSocket != null) {
-                try {
-                    listeningSocket.close();
-                    log.info("server listening socket closed");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            } catch (SocketException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
 
-    private void handleJSONServerMessage(Document json, Socket socket, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+    // TO DO UDP implementation
+    private void handleJSONServerMessage(Document json, Socket socket, BufferedWriter out, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
-        Integer port =  (int) hostPort.getLong("port");
+        Integer port;
+        if (mode == "udp"){
+            port = (int) hostPort.getLong("udpPort");
+        }  else {
+            port = (int) hostPort.getLong("port");
+        }
         String host = hostPort.getString("host");
         String invalidProtocol;
+        byte[] sendBytes = new byte[1024];
+        InetAddress IPAddress = InetAddress.getByName(host);
 
         switch (command) {
             case "HANDSHAKE_RESPONSE":
@@ -117,11 +186,16 @@ public class ConnectionHandler implements Runnable {
                     // Proofing if a peer accepted an existing connection
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-                        send(invalidProtocol, out);
+                        if (mode == "tcp") {send(invalidProtocol, out); };
+                        if (mode == "udp") {
+                            sendBytes = invalidProtocol.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            socketUDP.send(sendPacket);
+                        }
                         log.info("sending to " + host + ":" + "port " + invalidProtocol);
                     } else {
                         // Start threads for the outgoing connection
-                        controller.addOutgoingConnection(host, port, socket);
+                        controller.addOutgoingConnection(host, port, socket, mode, socketUDP);
                     }
                 }
                 break;
@@ -135,7 +209,7 @@ public class ConnectionHandler implements Runnable {
                     host = hp.host;
                     if (host != null && port != null) {
                         if (!controller.isPeerConnected(host, port)) {
-                            connect(host, port);
+                            connect(host, port, mode);
                         }
                     }
                 }
@@ -143,18 +217,31 @@ public class ConnectionHandler implements Runnable {
             default:
                 log.warning("received an invalid message from " + host + ":" + port);
                 invalidProtocol = Messages.getInvalidProtocol("expected HANDSHAKE_RESPONSE");
-                send(invalidProtocol, out);
+                if (mode == "tcp") {send(invalidProtocol, out); };
+                if (mode == "udp") {
+                    sendBytes = invalidProtocol.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                    socketUDP.send(sendPacket);
+                }
                 log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                 break;
         }
     }
 
-
-    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedWriter out) throws IOException, NoSuchAlgorithmException {
+    //TO DO UDP implementation
+    private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedWriter out, String mode, DatagramSocket clientSocketUDP) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
-        Integer port =  (int) hostPort.getLong("port");
+        Integer port;
+        if (mode == "udp"){
+            port = (int) hostPort.getLong("udpPort");
+        }  else {
+            port = (int) hostPort.getLong("port");
+        }
         String host = hostPort.getString("host");
+
+        byte[] sendBytes = new byte[1024];
+        InetAddress IPAddress = InetAddress.getByName(host);
 
         switch (command) {
             case "HANDSHAKE_REQUEST":
@@ -164,7 +251,12 @@ public class ConnectionHandler implements Runnable {
                 if (host != null && port != null) {
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-                        send(invalidProtocol, out);
+                        if (mode == "tcp") { send(invalidProtocol, out); };
+                        if (mode == "udp") {
+                            sendBytes = invalidProtocol.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            clientSocketUDP.send(sendPacket);
+                        }
                         log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                     } else if (!controller.canAcceptIncomingConnection()) {
                         Map<String, Integer> connectedPeers = controller.getConnectedPeers();
@@ -175,7 +267,7 @@ public class ConnectionHandler implements Runnable {
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
                         log.info("sending to " + host + ":" + port + " " + handShakeResponse);
-                        controller.addIncomingConnection(host, port, clientSocket);
+                        controller.addIncomingConnection(host, port, clientSocket, mode, clientSocketUDP);
                     }
                 }
                 break;

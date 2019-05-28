@@ -7,6 +7,9 @@ import unimelb.bitbox.util.Messages;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
@@ -19,19 +22,23 @@ public class PeerClient implements Runnable {
 
     private String host;
     private int port;
+    private String mode;
     private Queue<FileSystemEvent> events;
     private Queue<String> messages;
     private BufferedWriter out;
     private boolean closed;
+    private DatagramSocket socketUDP;
 
     // PeerClient constructor
-    public PeerClient(String host, int port, Socket socket) throws IOException {
+    public PeerClient(String host, int port, Socket socket, String mode, DatagramSocket socketUDP) throws IOException {
         this.host = host;
         this.port = port;
+        this.mode = mode;
         this.events = new LinkedList<>();
         this.messages = new LinkedList<>();
         this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.closed = false;
+        this.socketUDP = socketUDP;
     }
 
     /**
@@ -71,15 +78,36 @@ public class PeerClient implements Runnable {
                 switch (command) {
                     case "FILE_CREATE":
                         request = Messages.getFileCreateRequest(md5, lastModified, fileSize, pathName);
-                        send(request);
+                        if (mode == "tcp") {send(request); };
+                        if (mode == "udp") {
+                            byte[] sendBytes = new byte[1024];
+                            InetAddress IPAddress = InetAddress.getByName(host);
+                            sendBytes = request.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            socketUDP.send(sendPacket);
+                        }
                         break;
                     case "FILE_DELETE":
                         request = Messages.getFileDeleteRequest(md5, lastModified, fileSize, pathName);
-                        send(request);
+                        if (mode == "tcp") {send(request); };
+                        if (mode == "udp") {
+                            byte[] sendBytes = new byte[1024];
+                            InetAddress IPAddress = InetAddress.getByName(host);
+                            sendBytes = request.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            socketUDP.send(sendPacket);
+                        }
                         break;
                     case "FILE_MODIFY":
                         request = Messages.getFileModifyRequest(md5, lastModified, fileSize, pathName);
-                        send(request);
+                        if (mode == "tcp") {send(request); };
+                        if (mode == "udp") {
+                            byte[] sendBytes = new byte[1024];
+                            InetAddress IPAddress = InetAddress.getByName(host);
+                            sendBytes = request.getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                            socketUDP.send(sendPacket);
+                        }
                         break;
                     default:
                         break;
@@ -140,7 +168,14 @@ public class PeerClient implements Runnable {
             String message;
             try {
                 if ((message = this.messages.poll()) != null) {
-                    send(message);
+                    if (mode == "tcp") {send(message); };
+                    if (mode == "udp") {
+                        byte[] sendBytes = new byte[1024];
+                        InetAddress IPAddress = InetAddress.getByName(host);
+                        sendBytes = message.getBytes();
+                        DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                        socketUDP.send(sendPacket);
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -155,6 +190,7 @@ public class PeerClient implements Runnable {
      * @param message request or response message
      * @throws IOException
      */
+
     private void send(String message) throws IOException {
         out.write(message + '\n');
         log.info("sending to " + host + ":" + port + " " + message);

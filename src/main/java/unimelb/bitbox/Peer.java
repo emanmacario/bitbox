@@ -8,6 +8,7 @@ import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
+import java.net.DatagramSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -18,15 +19,18 @@ public class Peer {
 
     private String peerHost;
     private Integer peerPort;
+    private String mode;
     private PeerClient client;
     private PeerServer server;
 
-    public Peer(String host, int port, Socket socket, ConnectionObserver observer) throws IOException, NoSuchAlgorithmException {
+    // TO DO UDP Implementation
+    public Peer(String host, int port, Socket socket, ConnectionObserver observer, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
         this.peerHost = host;
         this.peerPort = port;
-        this.client = new PeerClient(host, port, socket);
-        this.server = new PeerServer(this.client, host, port, socket, observer);
+        this.mode = mode;
+        this.client = new PeerClient(host, port, socket, mode, socketUDP);
+        this.server = new PeerServer(this.client, host, port, socket, observer, mode, socketUDP);
         this.start();
     }
 
@@ -60,6 +64,10 @@ public class Peer {
         return this.peerPort;
     }
 
+    public String getMode() {
+        return this.mode;
+    }
+
     public static void main( String[] args ) throws IOException, NumberFormatException, NoSuchAlgorithmException, InterruptedException
     {
         System.setProperty("java.util.logging.SimpleFormatter.format",
@@ -69,10 +77,16 @@ public class Peer {
 
         // Read configuration file values
         String advertisedName = Configuration.getConfigurationValue("advertisedName");
-        int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
+        String mode = Configuration.getConfigurationValue("mode");
+        int serverPort;
+        if (mode == "udp") {
+            serverPort = Integer.parseInt(Configuration.getConfigurationValue("udpPort"));
+        } else {
+            serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
+        }
 
         // Start main I/O connection handler thread
-        ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName);
+        ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName, mode);
         Thread connectionHandlerThread = new Thread(connectionHandler);
         connectionHandlerThread.start();
 
@@ -83,7 +97,7 @@ public class Peer {
             String host = peerHostPort[0];
             int port = Integer.parseInt(peerHostPort[1]);
             log.info("attempting to connect to " + host + ":" + port);
-            connectionHandler.connect(host,port);
+            connectionHandler.connect(host,port, mode);
         }
     }
 }

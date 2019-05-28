@@ -5,6 +5,9 @@ import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +17,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.logging.Logger;
 
+
 public class PeerServer implements FileSystemObserver, Runnable {
     private static Logger log = Logger.getLogger(PeerServer.class.getName());
 
@@ -22,9 +26,13 @@ public class PeerServer implements FileSystemObserver, Runnable {
     private ConnectionObserver observer;
     private String host;
     private int port;
+    private String mode;
     private BufferedReader in;
     private BufferedWriter out;
+    private DatagramPacket udpIn;
+    private DatagramPacket udpOut;
     private long blockSize;
+    private DatagramSocket socketUDP;
 
     /**
      * PeerServer constructor
@@ -35,7 +43,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @throws NoSuchAlgorithmException
      * @throws IOException
      */
-    public PeerServer(PeerClient client, String host, int port, Socket socket, ConnectionObserver observer)
+    public PeerServer(PeerClient client, String host, int port, Socket socket, ConnectionObserver observer, String mode, DatagramSocket socketUDP)
             throws NoSuchAlgorithmException, IOException {
         if (fileSystemManager == null) {
             fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
@@ -43,10 +51,27 @@ public class PeerServer implements FileSystemObserver, Runnable {
         this.client = client;
         this.host = host;
         this.port = port;
-        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-        this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        this.mode = mode;
+        this.blockSize = blockSize;
+        // TO DO UDP Implementation
+        if (mode == "udp") {
+            blockSize = 8192;
+            // Create socket, get input and output buffers
+            DatagramSocket clientSocketUDP = new DatagramSocket(port);
+            byte[] sendData = new byte[8192];
+            byte[] receiveData = new byte[8192];
+
+            this.udpIn = new DatagramPacket(receiveData, receiveData.length);
+            this.udpOut = new DatagramPacket(sendData, sendData.length);
+            clientSocketUDP.receive(udpIn);
+        }
+        else { // assume default of TCP
+            this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        }
         this.observer = observer;
         this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+        this.socketUDP = socketUDP;
     }
 
     @Override
@@ -63,8 +88,26 @@ public class PeerServer implements FileSystemObserver, Runnable {
         // Read any incoming request from the input buffer.
         // This blocks until an incoming message is received.
         String clientMessage;
-        try {
-            while ((clientMessage = in.readLine()) != null) {
+        if (mode == "tcp") {
+            try {
+                while ((clientMessage = in.readLine()) != null) {
+                    // Parse the request into a JSON object
+                    Document clientMessageJSON = Document.parse(clientMessage);
+
+                    // Handle the incoming request
+                    try {
+                        handleIncomingClientMessage(clientMessageJSON);
+                    } catch (NoSuchAlgorithmException | IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        else if (mode == "udp") {
+            byte[] data = udpIn.getData();
+            while ((clientMessage = new String(data, 0, data.length)) != null) {
                 // Parse the request into a JSON object
                 Document clientMessageJSON = Document.parse(clientMessage);
 
@@ -75,8 +118,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
                     e.printStackTrace();
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
         observer.disconnect(host, port);
         log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
@@ -134,7 +175,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
             default:
                 // Invalid protocol
                 response = Messages.getInvalidProtocol("invalid command");
-                send(response);
+                if (mode == "tcp") {send(response); };
+                if (mode == "udp") {
+                    byte[] sendBytes = new byte[1024];
+                    InetAddress IPAddress = InetAddress.getByName(host);
+                    sendBytes = response.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                    socketUDP.send(sendPacket);
+                }
                 break;
         }
     }
@@ -160,7 +208,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Create and send response
         String response = Messages.getDirectoryCreateResponse(pathName, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
     }
 
     /**
@@ -183,7 +238,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
             message =  status ? "directory deleted" : "there was a problem deleting the directory";
         }
         String response = Messages.getDirectoryDeleteResponse(pathName, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
     }
 
     /**
@@ -215,7 +277,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Send the response
         String response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
 
         // If file create request was successful
         // then attempt to get the modified file
@@ -252,7 +321,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
             message =  status ? "file deleted" : "there was a problem deleting the file";
         }
         String response = Messages.getFileDeleteResponse(md5, lastModified, fileSize, pathName, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
     }
 
     /**
@@ -283,7 +359,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Send the response
         String response = Messages.getFileModifyResponse(md5, lastModified, fileSize, pathName, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
 
         // If file modify request was successful
         // then attempt to get the modified file
@@ -333,7 +416,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Create and send response
         String response = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
-        send(response);
+        if (mode == "tcp") {send(response); };
+        if (mode == "udp") {
+            byte[] sendBytes = new byte[1024];
+            InetAddress IPAddress = InetAddress.getByName(host);
+            sendBytes = response.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+            socketUDP.send(sendPacket);
+        }
     }
 
     /**
