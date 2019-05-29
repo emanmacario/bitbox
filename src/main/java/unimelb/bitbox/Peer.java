@@ -78,8 +78,9 @@ public class Peer {
         // Read configuration file values
         String advertisedName = Configuration.getConfigurationValue("advertisedName");
         String mode = Configuration.getConfigurationValue("mode");
+        log.info("Mode selected: " + mode);
         int serverPort;
-        if (mode == "udp") {
+        if (mode.equals("udp")) {
             serverPort = Integer.parseInt(Configuration.getConfigurationValue("udpPort"));
         } else {
             serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));

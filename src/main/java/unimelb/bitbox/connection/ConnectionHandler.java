@@ -19,6 +19,7 @@ public class ConnectionHandler implements Runnable {
     private int port;
     private String advertisedHost;
     private ServerSocket listeningSocket;
+    private DatagramSocket listeningSocketUDP;
     private PeerConnectionController controller;
     private String mode;
 
@@ -26,6 +27,7 @@ public class ConnectionHandler implements Runnable {
         this.port = port;
         this.advertisedHost = advertisedHost;
         this.listeningSocket = new ServerSocket(port);
+        this.listeningSocketUDP = new DatagramSocket(port);
         this.mode = mode;
         this.controller = new PeerConnectionController();
     }
@@ -38,7 +40,7 @@ public class ConnectionHandler implements Runnable {
      * @param port the port number of the peer
      */
     public void connect(String host, int port, String mode) {
-        if (mode == "tcp") {
+        if (mode.equals("tcp")) {
             try {
                 // Create client socket, get input and output buffers
                 Socket clientSocket = new Socket(host, port);
@@ -62,32 +64,17 @@ public class ConnectionHandler implements Runnable {
                 log.warning("while connecting to " + host + ":" + port + " connection refused");
             }
         }
-        else if (mode == "udp") {
+        // UDP doesn't use handshake
+        else if (mode.equals("udp")) {
             try {
                 // Create client socket, get input and output buffers
                 DatagramSocket clientSocketUDP = new DatagramSocket(port);
+                // TO DO change 8192 to blockSize
                 byte[] sendHandshake = new byte[8192];
                 byte[] receiveData = new byte[8192];
 
                 InetAddress IPAddress = InetAddress.getByName(host);
 
-                // Attempt to perform a handshake with the peer
-                String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
-                sendHandshake = handshakeRequest.getBytes();
-                DatagramPacket sendPacket = new DatagramPacket(sendHandshake, sendHandshake.length, IPAddress, port);
-                clientSocketUDP.send(sendPacket);
-                log.info("sending to " + host + ":" + "port " + handshakeRequest);
-
-                DatagramPacket in = new DatagramPacket(receiveData, receiveData.length);
-                clientSocketUDP.receive(in);
-                byte[] data = in.getData();
-                String handshakeResponse = new String(data, 0, data.length);
-                Document handshakeResponseJSON = Document.parse(handshakeResponse);
-                try {
-                    handleJSONServerMessage(handshakeResponseJSON, null, null, "udp", clientSocketUDP); // this needs to be changed
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                }
             } catch (IOException e) {
                 log.warning("while connecting to " + host + ":" + port + " connection refused");
             }
@@ -95,7 +82,7 @@ public class ConnectionHandler implements Runnable {
     }
     @Override
     public void run() {
-        if (mode == "tcp") {
+        if (mode.equals("tcp")) {
             try {
                 while (true) {
                     // Accept an incoming client connection request (blocking call)
@@ -132,21 +119,21 @@ public class ConnectionHandler implements Runnable {
                     }
                 }
             }
-        } else if (mode == "udp") {
+        } else if (mode.equals("udp")) {
             try {
                 while (true) {
                     // Accept an incoming client connection request (blocking call)
                     byte[] buffer = new byte[8192];
-                    DatagramSocket clientSocketUDP = new DatagramSocket(port);
+                    //DatagramSocket clientSocketUDP = new DatagramSocket(port);
 
                     DatagramPacket in = new DatagramPacket(buffer, buffer.length);
-                    clientSocketUDP.receive(in);
+                    listeningSocketUDP.receive(in);
 
                     byte[] data = in.getData();
                     String clientMessage = new String(data, 0, data.length);
                     Document clientMessageJSON = Document.parse(clientMessage);
                     try {
-                        handleJSONClientMessage(clientMessageJSON, null, null, "udp", clientSocketUDP);
+                        handleJSONClientMessage(clientMessageJSON, null, null, "udp", listeningSocketUDP);
                     } catch (IOException e) {
                         e.printStackTrace();
                     } catch (NoSuchAlgorithmException e) {
@@ -168,7 +155,7 @@ public class ConnectionHandler implements Runnable {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
         Integer port;
-        if (mode == "udp"){
+        if (mode.equals("udp")){
             port = (int) hostPort.getLong("udpPort");
         }  else {
             port = (int) hostPort.getLong("port");
@@ -187,13 +174,7 @@ public class ConnectionHandler implements Runnable {
                     // Proofing if a peer accepted an existing connection
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-                        if (mode == "tcp") {send(invalidProtocol, out); };
-                        if (mode == "udp") {
-                            System.out.print("here2");
-                            sendBytes = invalidProtocol.getBytes();
-                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                            socketUDP.send(sendPacket);
-                        }
+                        if (mode.equals("tcp")) {send(invalidProtocol, out); };
                         log.info("sending to " + host + ":" + "port " + invalidProtocol);
                     } else {
                         // Start threads for the outgoing connection
@@ -219,12 +200,7 @@ public class ConnectionHandler implements Runnable {
             default:
                 log.warning("received an invalid message from " + host + ":" + port);
                 invalidProtocol = Messages.getInvalidProtocol("expected HANDSHAKE_RESPONSE");
-                if (mode == "tcp") {send(invalidProtocol, out); };
-                if (mode == "udp") {
-                    sendBytes = invalidProtocol.getBytes();
-                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                    socketUDP.send(sendPacket);
-                }
+                if (mode.equals("tcp")) {send(invalidProtocol, out); };
                 log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                 break;
         }
@@ -235,7 +211,7 @@ public class ConnectionHandler implements Runnable {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
         Integer port;
-        if (mode == "udp"){
+        if (mode.equals("udp")){
             port = (int) hostPort.getLong("udpPort");
         }  else {
             port = (int) hostPort.getLong("port");
@@ -254,35 +230,19 @@ public class ConnectionHandler implements Runnable {
                 if (host != null && port != null) {
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-                        if (mode == "tcp") { send(invalidProtocol, out); };
-                        if (mode == "udp") {
-                            sendBytes = invalidProtocol.getBytes();
-                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                            clientSocketUDP.send(sendPacket);
-                        }
+                        if (mode.equals("tcp")) { send(invalidProtocol, out); };
                         log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                     } else if (!controller.canAcceptIncomingConnection()) {
                         Map<String, Integer> connectedPeers = controller.getConnectedPeers();
                         String connectionRefused = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
-                        if (mode == "tcp") { send(connectionRefused, out); };
-                        if (mode == "udp") {
-                            sendBytes = connectionRefused.getBytes();
-                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                            clientSocketUDP.send(sendPacket);
-                        }
+                        if (mode.equals("tcp")) { send(connectionRefused, out); };
                             log.info("sending to " + host + ":" + port + " " + connectionRefused);
                     } else {
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
-                        if (mode == "tcp") { send(handShakeResponse, out); };
-                        if (mode == "udp") {
-                            System.out.print("here2");
-                            sendBytes = handShakeResponse.getBytes();
-                            DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                            clientSocketUDP.send(sendPacket);
-                        }
+                        if (mode.equals("tcp")) { send(handShakeResponse, out); };
 
-                                log.info("sending to " + host + ":" + port + " " + handShakeResponse);
+                        log.info("sending to " + host + ":" + port + " " + handShakeResponse);
                         controller.addIncomingConnection(host, port, clientSocket, mode, clientSocketUDP);
                     }
                 }
@@ -290,8 +250,8 @@ public class ConnectionHandler implements Runnable {
 
             default:
                 invalidProtocol = Messages.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
-                if (mode == "tcp") { send(invalidProtocol, out); };
-                if (mode == "udp") {
+                if (mode.equals("tcp")) { send(invalidProtocol, out); };
+                if (mode.equals("udp")) {
                     sendBytes = invalidProtocol.getBytes();
                     DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                     clientSocketUDP.send(sendPacket);

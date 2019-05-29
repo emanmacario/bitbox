@@ -54,7 +54,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
         this.mode = mode;
         this.blockSize = blockSize;
         // TO DO UDP Implementation
-        if (mode == "udp") {
+        if (mode.equals("udp")) {
             blockSize = 8192;
             // Create socket, get input and output buffers
             DatagramSocket clientSocketUDP = new DatagramSocket(port);
@@ -88,7 +88,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
         // Read any incoming request from the input buffer.
         // This blocks until an incoming message is received.
         String clientMessage;
-        if (mode == "tcp") {
+        if (mode.equals("tcp")) {
             try {
                 while ((clientMessage = in.readLine()) != null) {
                     // Parse the request into a JSON object
@@ -105,8 +105,9 @@ public class PeerServer implements FileSystemObserver, Runnable {
                 e.printStackTrace();
             }
         }
-        else if (mode == "udp") {
+        else if (mode.equals("udp")) {
             byte[] data = udpIn.getData();
+            // Not sure about that while condition
             while ((clientMessage = new String(data, 0, data.length)) != null) {
                 // Parse the request into a JSON object
                 Document clientMessageJSON = Document.parse(clientMessage);
@@ -119,6 +120,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
                 }
             }
         }
+        // TO DO
         observer.disconnect(host, port);
         log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
 
@@ -175,11 +177,10 @@ public class PeerServer implements FileSystemObserver, Runnable {
             default:
                 // Invalid protocol
                 response = Messages.getInvalidProtocol("invalid command");
-                if (mode == "tcp") {send(response); };
-                if (mode == "udp") {
-                    byte[] sendBytes = new byte[1024];
+                if (mode.equals("tcp")) {send(response); };
+                if (mode.equals("udp")) {
                     InetAddress IPAddress = InetAddress.getByName(host);
-                    sendBytes = response.getBytes();
+                    byte[] sendBytes = response.getBytes();
                     DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                     socketUDP.send(sendPacket);
                 }
@@ -208,11 +209,10 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Create and send response
         String response = Messages.getDirectoryCreateResponse(pathName, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
-            byte[] sendBytes = new byte[1024];
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             InetAddress IPAddress = InetAddress.getByName(host);
-            sendBytes = response.getBytes();
+            byte[] sendBytes = response.getBytes();
             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
             socketUDP.send(sendPacket);
         }
@@ -238,8 +238,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
             message =  status ? "directory deleted" : "there was a problem deleting the directory";
         }
         String response = Messages.getDirectoryDeleteResponse(pathName, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
             sendBytes = response.getBytes();
@@ -277,8 +277,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Send the response
         String response = Messages.getFileCreateResponse(md5, lastModified, fileSize, pathName, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
             sendBytes = response.getBytes();
@@ -321,8 +321,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
             message =  status ? "file deleted" : "there was a problem deleting the file";
         }
         String response = Messages.getFileDeleteResponse(md5, lastModified, fileSize, pathName, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
             sendBytes = response.getBytes();
@@ -359,8 +359,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Send the response
         String response = Messages.getFileModifyResponse(md5, lastModified, fileSize, pathName, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
             sendBytes = response.getBytes();
@@ -416,8 +416,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         // Create and send response
         String response = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
-        if (mode == "tcp") {send(response); };
-        if (mode == "udp") {
+        if (mode.equals("tcp")) {send(response); };
+        if (mode.equals("udp")) {
             byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
             sendBytes = response.getBytes();

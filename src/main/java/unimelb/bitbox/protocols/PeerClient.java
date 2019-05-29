@@ -62,11 +62,23 @@ public class PeerClient implements Runnable {
         switch (command) {
             case "DIRECTORY_CREATE":
                 request = Messages.getDirectoryCreateRequest(pathName);
-                send(request);
+                if (mode.equals("tcp")) {send(request); };
+                if (mode.equals("udp")) {
+                    InetAddress IPAddress = InetAddress.getByName(host);
+                    byte[] sendBytes = request.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                    socketUDP.send(sendPacket);
+                }
                 break;
             case "DIRECTORY_DELETE":
                 request = Messages.getDirectoryDeleteRequest(pathName);
-                send(request);
+                if (mode.equals("tcp")) {send(request); };
+                if (mode.equals("udp")) {
+                    InetAddress IPAddress = InetAddress.getByName(host);
+                    byte[] sendBytes = request.getBytes();
+                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
+                    socketUDP.send(sendPacket);
+                }
                 break;
             case "FILE_CREATE":
             case "FILE_DELETE":
@@ -78,33 +90,30 @@ public class PeerClient implements Runnable {
                 switch (command) {
                     case "FILE_CREATE":
                         request = Messages.getFileCreateRequest(md5, lastModified, fileSize, pathName);
-                        if (mode == "tcp") {send(request); };
-                        if (mode == "udp") {
-                            byte[] sendBytes = new byte[1024];
+                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
-                            sendBytes = request.getBytes();
+                            byte[] sendBytes = request.getBytes();
                             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                             socketUDP.send(sendPacket);
                         }
                         break;
                     case "FILE_DELETE":
                         request = Messages.getFileDeleteRequest(md5, lastModified, fileSize, pathName);
-                        if (mode == "tcp") {send(request); };
-                        if (mode == "udp") {
-                            byte[] sendBytes = new byte[1024];
+                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
-                            sendBytes = request.getBytes();
+                            byte[] sendBytes = request.getBytes();
                             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                             socketUDP.send(sendPacket);
                         }
                         break;
                     case "FILE_MODIFY":
                         request = Messages.getFileModifyRequest(md5, lastModified, fileSize, pathName);
-                        if (mode == "tcp") {send(request); };
-                        if (mode == "udp") {
-                            byte[] sendBytes = new byte[1024];
+                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
-                            sendBytes = request.getBytes();
+                            byte[] sendBytes = request.getBytes();
                             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
                             socketUDP.send(sendPacket);
                         }
@@ -168,8 +177,8 @@ public class PeerClient implements Runnable {
             String message;
             try {
                 if ((message = this.messages.poll()) != null) {
-                    if (mode == "tcp") {send(message); };
-                    if (mode == "udp") {
+                    if (mode.equals("tcp")) {send(message); };
+                    if (mode.equals("udp")) {
                         byte[] sendBytes = new byte[1024];
                         InetAddress IPAddress = InetAddress.getByName(host);
                         sendBytes = message.getBytes();
