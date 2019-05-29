@@ -40,6 +40,7 @@ public class ConnectionHandler implements Runnable {
      * @param port the port number of the peer
      */
     public void connect(String host, int port, String mode) {
+        // UDP doesn't use handshake
         if (mode.equals("tcp")) {
             try {
                 // Create client socket, get input and output buffers
@@ -56,25 +57,10 @@ public class ConnectionHandler implements Runnable {
                 String handshakeResponse = in.readLine(); // Blocking receive call
                 Document handshakeResponseJSON = Document.parse(handshakeResponse);
                 try {
-                    handleJSONServerMessage(handshakeResponseJSON, clientSocket, out, "tcp", null);
+                    handleJSONServerMessage(handshakeResponseJSON, clientSocket, out, mode, null);
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 }
-            } catch (IOException e) {
-                log.warning("while connecting to " + host + ":" + port + " connection refused");
-            }
-        }
-        // UDP doesn't use handshake
-        else if (mode.equals("udp")) {
-            try {
-                // Create client socket, get input and output buffers
-                DatagramSocket clientSocketUDP = new DatagramSocket(port);
-                // TO DO change 8192 to blockSize
-                byte[] sendHandshake = new byte[8192];
-                byte[] receiveData = new byte[8192];
-
-                InetAddress IPAddress = InetAddress.getByName(host);
-
             } catch (IOException e) {
                 log.warning("while connecting to " + host + ":" + port + " connection refused");
             }
@@ -96,7 +82,7 @@ public class ConnectionHandler implements Runnable {
                         String clientMessage = in.readLine(); // Blocking receive call
                         Document clientMessageJSON = Document.parse(clientMessage);
                         try {
-                            handleJSONClientMessage(clientMessageJSON, clientSocket, out, "tcp", null);
+                            handleJSONClientMessage(clientMessageJSON, clientSocket, out, mode, null);
                         } catch (IOException e) {
                             e.printStackTrace();
                         } catch (NoSuchAlgorithmException e) {
@@ -133,7 +119,7 @@ public class ConnectionHandler implements Runnable {
                     String clientMessage = new String(data, 0, data.length);
                     Document clientMessageJSON = Document.parse(clientMessage);
                     try {
-                        handleJSONClientMessage(clientMessageJSON, null, null, "udp", listeningSocketUDP);
+                        handleJSONClientMessage(clientMessageJSON, null, null, mode, listeningSocketUDP);
                     } catch (IOException e) {
                         e.printStackTrace();
                     } catch (NoSuchAlgorithmException e) {
@@ -210,15 +196,10 @@ public class ConnectionHandler implements Runnable {
     private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedWriter out, String mode, DatagramSocket clientSocketUDP) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
-        Integer port;
-        if (mode.equals("udp")){
-            port = (int) hostPort.getLong("udpPort");
-        }  else {
-            port = (int) hostPort.getLong("port");
-        }
+        Integer port = (int) hostPort.getLong("port");
         String host = hostPort.getString("host");
 
-        byte[] sendBytes = new byte[1024];
+        byte[] sendBytes;
         InetAddress IPAddress = InetAddress.getByName(host);
 
         switch (command) {
