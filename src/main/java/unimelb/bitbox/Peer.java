@@ -23,7 +23,7 @@ public class Peer {
     private PeerClient client;
     private PeerServer server;
 
-    // TO DO UDP Implementation
+    // TODO UDP Implementation
     public Peer(String host, int port, Socket socket, ConnectionObserver observer, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
         this.peerHost = host;

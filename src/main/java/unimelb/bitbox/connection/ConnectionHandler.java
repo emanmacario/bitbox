@@ -136,13 +136,14 @@ public class ConnectionHandler implements Runnable {
         }
     }
 
-    // TO DO UDP implementation
+    // TODO UDP implementation
     private void handleJSONServerMessage(Document json, Socket socket, BufferedWriter out, String mode, DatagramSocket socketUDP) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
         Integer port;
         if (mode.equals("udp")){
             port = (int) hostPort.getLong("udpPort");
+            return;
         }  else {
             port = (int) hostPort.getLong("port");
         }
@@ -184,15 +185,17 @@ public class ConnectionHandler implements Runnable {
                 }
                 break;
             default:
-                log.warning("received an invalid message from " + host + ":" + port);
                 invalidProtocol = Messages.getInvalidProtocol("expected HANDSHAKE_RESPONSE");
-                if (mode.equals("tcp")) {send(invalidProtocol, out); };
-                log.info("sending to " + host + ":" + port + " " + invalidProtocol);
+                if (mode.equals("tcp")) {
+                    log.warning("received an invalid message from " + host + ":" + port);
+                    send(invalidProtocol, out);
+                    log.info("sending to " + host + ":" + port + " " + invalidProtocol);
+                }
                 break;
         }
     }
 
-    //TO DO UDP implementation
+    //TODO UDP implementation
     private void handleJSONClientMessage(Document json, Socket clientSocket, BufferedWriter out, String mode, DatagramSocket clientSocketUDP) throws IOException, NoSuchAlgorithmException {
         String command = json.getString("command");
         Document hostPort = (Document) json.get("hostPort");
@@ -211,17 +214,26 @@ public class ConnectionHandler implements Runnable {
                 if (host != null && port != null) {
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-                        if (mode.equals("tcp")) { send(invalidProtocol, out); };
+                        if (mode.equals("tcp")) {
+                            send(invalidProtocol, out);
+                        }
+                        ;
                         log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                     } else if (!controller.canAcceptIncomingConnection()) {
                         Map<String, Integer> connectedPeers = controller.getConnectedPeers();
                         String connectionRefused = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
-                        if (mode.equals("tcp")) { send(connectionRefused, out); };
-                            log.info("sending to " + host + ":" + port + " " + connectionRefused);
+                        if (mode.equals("tcp")) {
+                            send(connectionRefused, out);
+                        }
+                        ;
+                        log.info("sending to " + host + ":" + port + " " + connectionRefused);
                     } else {
                         String handShakeResponse = Messages.getHandshakeResponse(advertisedHost, this.port);
                         send(handShakeResponse, out);
-                        if (mode.equals("tcp")) { send(handShakeResponse, out); };
+                        if (mode.equals("tcp")) {
+                            send(handShakeResponse, out);
+                        }
+                        ;
 
                         log.info("sending to " + host + ":" + port + " " + handShakeResponse);
                         controller.addIncomingConnection(host, port, clientSocket, mode, clientSocketUDP);
@@ -231,13 +243,10 @@ public class ConnectionHandler implements Runnable {
 
             default:
                 invalidProtocol = Messages.getInvalidProtocol("Expected HANDSHAKE_REQUEST");
-                if (mode.equals("tcp")) { send(invalidProtocol, out); };
-                if (mode.equals("udp")) {
-                    sendBytes = invalidProtocol.getBytes();
-                    DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
-                    clientSocketUDP.send(sendPacket);
+                if (mode.equals("tcp")) {
+                    send(invalidProtocol, out);
+                    log.info("sending to " + host + ":" + port + " " + invalidProtocol);
                 }
-                log.info("sending to " + host + ":" + port + " " + invalidProtocol);
         }
     }
 

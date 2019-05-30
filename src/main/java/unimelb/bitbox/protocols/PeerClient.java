@@ -62,7 +62,7 @@ public class PeerClient implements Runnable {
         switch (command) {
             case "DIRECTORY_CREATE":
                 request = Messages.getDirectoryCreateRequest(pathName);
-                if (mode.equals("tcp")) {send(request); };
+                if (mode.equals("tcp")) {send(request); }
                 if (mode.equals("udp")) {
                     InetAddress IPAddress = InetAddress.getByName(host);
                     byte[] sendBytes = request.getBytes();
@@ -72,7 +72,7 @@ public class PeerClient implements Runnable {
                 break;
             case "DIRECTORY_DELETE":
                 request = Messages.getDirectoryDeleteRequest(pathName);
-                if (mode.equals("tcp")) {send(request); };
+                if (mode.equals("tcp")) {send(request); }
                 if (mode.equals("udp")) {
                     InetAddress IPAddress = InetAddress.getByName(host);
                     byte[] sendBytes = request.getBytes();
@@ -90,7 +90,7 @@ public class PeerClient implements Runnable {
                 switch (command) {
                     case "FILE_CREATE":
                         request = Messages.getFileCreateRequest(md5, lastModified, fileSize, pathName);
-                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("tcp")) {send(request); }
                         if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
                             byte[] sendBytes = request.getBytes();
@@ -100,7 +100,7 @@ public class PeerClient implements Runnable {
                         break;
                     case "FILE_DELETE":
                         request = Messages.getFileDeleteRequest(md5, lastModified, fileSize, pathName);
-                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("tcp")) {send(request); }
                         if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
                             byte[] sendBytes = request.getBytes();
@@ -110,7 +110,7 @@ public class PeerClient implements Runnable {
                         break;
                     case "FILE_MODIFY":
                         request = Messages.getFileModifyRequest(md5, lastModified, fileSize, pathName);
-                        if (mode.equals("tcp")) {send(request); };
+                        if (mode.equals("tcp")) {send(request); }
                         if (mode.equals("udp")) {
                             InetAddress IPAddress = InetAddress.getByName(host);
                             byte[] sendBytes = request.getBytes();

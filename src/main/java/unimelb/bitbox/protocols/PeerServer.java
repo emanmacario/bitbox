@@ -32,7 +32,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
     private DatagramPacket udpIn;
     private DatagramPacket udpOut;
     private long blockSize;
-    private DatagramSocket socketUDP;
+    DatagramSocket socketUDP;
 
     /**
      * PeerServer constructor
@@ -53,17 +53,17 @@ public class PeerServer implements FileSystemObserver, Runnable {
         this.port = port;
         this.mode = mode;
         this.blockSize = blockSize;
-        // TO DO UDP Implementation
+        this.socketUDP = socketUDP;
+        // TODO UDP Implementation
         if (mode.equals("udp")) {
             blockSize = 8192;
             // Create socket, get input and output buffers
-            DatagramSocket clientSocketUDP = new DatagramSocket(port);
             byte[] sendData = new byte[8192];
             byte[] receiveData = new byte[8192];
 
             this.udpIn = new DatagramPacket(receiveData, receiveData.length);
             this.udpOut = new DatagramPacket(sendData, sendData.length);
-            clientSocketUDP.receive(udpIn);
+            socketUDP.receive(udpIn);
         }
         else { // assume default of TCP
             this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
@@ -71,7 +71,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
         this.observer = observer;
         this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
-        this.socketUDP = socketUDP;
     }
 
     @Override
@@ -106,10 +105,11 @@ public class PeerServer implements FileSystemObserver, Runnable {
             }
         }
         else if (mode.equals("udp")) {
-            byte[] data = udpIn.getData();
+            byte[] data;
             // Not sure about that while condition
-            while ((clientMessage = new String(data, 0, data.length)) != null) {
+            while ((data = udpIn.getData())!= null) {
                 // Parse the request into a JSON object
+                clientMessage = new String(data, 0, data.length);
                 Document clientMessageJSON = Document.parse(clientMessage);
 
                 // Handle the incoming request
@@ -120,7 +120,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
                 }
             }
         }
-        // TO DO
+        // TODO
         observer.disconnect(host, port);
         log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
 
@@ -418,9 +418,8 @@ public class PeerServer implements FileSystemObserver, Runnable {
         String response = Messages.getFileBytesResponse(md5, lastModified, fileSize, pathName, position, length, content, message, status);
         if (mode.equals("tcp")) {send(response); };
         if (mode.equals("udp")) {
-            byte[] sendBytes = new byte[1024];
             InetAddress IPAddress = InetAddress.getByName(host);
-            sendBytes = response.getBytes();
+            byte[] sendBytes = response.getBytes();
             DatagramPacket sendPacket = new DatagramPacket(sendBytes, sendBytes.length, IPAddress, port);
             socketUDP.send(sendPacket);
         }
