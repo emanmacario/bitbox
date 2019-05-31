@@ -69,10 +69,17 @@ public class Peer {
 
         // Read configuration file values
         String advertisedName = Configuration.getConfigurationValue("advertisedName");
-        int serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
+        String mode = Configuration.getConfigurationValue("mode");
+        log.info("Mode selected: " + mode);
+        int serverPort;
+        if (mode.equals("udp")) {
+            serverPort = Integer.parseInt(Configuration.getConfigurationValue("udpPort"));
+        } else {
+            serverPort = Integer.parseInt(Configuration.getConfigurationValue("port"));
+        }
 
         // Start main I/O connection handler thread
-        ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName);
+        ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName, mode);
         Thread connectionHandlerThread = new Thread(connectionHandler);
         connectionHandlerThread.start();
 
@@ -85,5 +92,7 @@ public class Peer {
             log.info("attempting to connect to " + host + ":" + port);
             connectionHandler.connect(host,port);
         }
+
+
     }
 }
