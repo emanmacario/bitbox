@@ -72,7 +72,7 @@ public class ConnectionHandler implements Runnable {
         else {
             // Retransmission parameters
             int MAX_TRIES = 5;
-            int TIMEOUT = 3000;
+            int TIMEOUT = 1000;
 
             try {
                 // Client socket does not need an IP address and port number
@@ -82,7 +82,8 @@ public class ConnectionHandler implements Runnable {
                 byte[] sendData = handshakeRequest.getBytes();
 
                 // Maximum receive blocking time (milliseconds)
-                clientSocketUDP .setSoTimeout(TIMEOUT);
+                listeningSocketUDP .setSoTimeout(TIMEOUT);
+                log.info("Client Socket UDP Port: " + clientSocketUDP.getPort());
 
                 // Initialise send and receive packets
                 DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, port);
@@ -94,30 +95,25 @@ public class ConnectionHandler implements Runnable {
                 do {
                     // Try sending the packet
                     try {
-                        clientSocketUDP.send(sendPacket);
+                        listeningSocketUDP.send(sendPacket);
                         log.info("sending to " + host + ":" + "port " + handshakeRequest);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                     // Try receiving a response
                     try {
-                        clientSocketUDP.receive(receivePacket);
+                        listeningSocketUDP.receive(receivePacket);
                         if (!receivePacket.getAddress().equals(serverAddress)) {
                             throw new IOException("Received packet from unknown address");
                         }
                         receivedResponse = true;
-
-                        String reply = new String(receivePacket.getData(), StandardCharsets.UTF_8);
-                        log.info("Reply received " + reply);
-
-                        /*
-                        String handshakeResponse = new String(receivePacket.getData());
+                        String handshakeResponse = new String(receivePacket.getData(), 0, receivePacket.getLength(), StandardCharsets.UTF_8);
                         Document handshakeResponseJSON = Document.parse(handshakeResponse);
                         try {
                             handleJSONServerMessage(handshakeResponseJSON, null, null);
                         } catch (NoSuchAlgorithmException e) {
                             e.printStackTrace();
-                        }*/
+                        }
 
                     } catch (InterruptedIOException e) {
                         tries += 1;
@@ -176,37 +172,43 @@ public class ConnectionHandler implements Runnable {
         }
         // Extension UDP implementation
         else {
-            byte[] receiveData = new byte[65535];
-            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             try {
+                listeningSocketUDP.setSoTimeout(0);
                 while (true) {
+                    byte[] receiveData = new byte[65535];
+                    DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+
                     listeningSocketUDP.receive(receivePacket);
-                    String clientMessage = new String(receivePacket.getData());
 
-                    System.out.println("Received message " + clientMessage);
-
-                    String reply = "reply";
-                    InetAddress address = receivePacket.getAddress();
-                    int port = receivePacket.getPort();
-                    DatagramPacket sendPacket = new DatagramPacket(reply.getBytes(), reply.getBytes().length, address, port);
-                    listeningSocketUDP.send(sendPacket);
-
-                    /*
+                    String clientMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
                     Document clientMessageJSON = Document.parse(clientMessage);
+                    String command = clientMessageJSON.getString("command");
+                    Document hostPort = (Document) clientMessageJSON.get("hostPort");
+
+                    //log.info("COMMAND: " + command);
+                    //log.info("hostPort is null: " + (hostPort == null));
+                    //log.info("HOSTPORT: " +  hostPort.toJson());
+
+                    String host = hostPort.getString("host");
+                    Integer port = (int) hostPort.getLong("port");
+                    //log.info("Host: " + host);
+                    //log.info("Port: " + port);
+
+
+
 
                     try {
                         handleJSONClientMessage(clientMessageJSON, null, null);
                     } catch (NoSuchAlgorithmException e) {
                         e.printStackTrace();
                     }
-                    */
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
                 if (listeningSocketUDP != null) {
                     listeningSocketUDP.close();
-                    log.info("server listening socket closed");
+                    log.info("server UDP listening socket closed");
                 }
             }
         }
@@ -227,7 +229,6 @@ public class ConnectionHandler implements Runnable {
                     // Proofing if a peer accepted an existing connection
                     if (controller.isPeerConnected(host, port)) {
                         invalidProtocol = Messages.getInvalidProtocol("peer already connected");
-
                         if (mode.equals("tcp")) {
                             send(invalidProtocol, out);
                             log.info("sending to " + host + ":" + "port " + invalidProtocol);
@@ -236,7 +237,8 @@ public class ConnectionHandler implements Runnable {
                         }
                     } else {
                         // Start threads for the outgoing connection
-                        controller.addOutgoingConnection(host, port, socket);
+                        // controller.addOutgoingConnection(host, port, socket);
+                        log.info("CONNECTION ESTABLISHED TO " + host + ":" + port);
                     }
                 }
                 break;
@@ -284,7 +286,8 @@ public class ConnectionHandler implements Runnable {
                         message = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
                     } else {
                         message = Messages.getHandshakeResponse(advertisedHost, this.port);
-                        controller.addIncomingConnection(host, port, clientSocket);
+                        // controller.addIncomingConnection(host, port, clientSocket);
+                        log.info("CONNECTION ESTABLISHED TO " + host + ":" + port);
                     }
                     if (mode.equals("tcp")) {
                         send(message, out);

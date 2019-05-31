@@ -81,7 +81,6 @@ public class Peer {
         // Start main I/O connection handler thread
         ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName, mode);
         Thread connectionHandlerThread = new Thread(connectionHandler);
-        connectionHandlerThread.start();
 
         // Attempt to connect to peers listed in the configuration file
         String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
@@ -93,6 +92,6 @@ public class Peer {
             connectionHandler.connect(host,port);
         }
 
-
+        connectionHandlerThread.start();
     }
 }
