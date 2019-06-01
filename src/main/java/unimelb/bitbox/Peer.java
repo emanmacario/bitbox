@@ -1,7 +1,6 @@
 package unimelb.bitbox;
 
 import unimelb.bitbox.connection.ClientConnectionHandler;
-import unimelb.bitbox.connection.ClientHandler;
 import unimelb.bitbox.connection.PeerConnectionHandler;
 import unimelb.bitbox.connection.ConnectionObserver;
 import unimelb.bitbox.protocols.PeerClient;
@@ -15,7 +14,6 @@ import java.net.DatagramSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class Peer {
