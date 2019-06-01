@@ -46,16 +46,11 @@ public class Messages {
         return doc2.toJson();
 	}
 	
-	public static String getConnectionRefused(Map<String,Integer> peers, String message) {
-		ArrayList<Document> peerList = new ArrayList<Document>();
-		for (Map.Entry<String, Integer> entry : peers.entrySet()) {
-            String host = entry.getKey();
-		    Integer port = entry.getValue();
-		    peerList.add(new HostPort(host, port).toDoc());
-		}
-
-		//System.out.println("Size of peerlist:" + peerList.size());
-	    
+	public static String getConnectionRefused(List<HostPort> peers, String message) {
+		ArrayList<Document> peerList = new ArrayList<>();
+		for (HostPort peer : peers) {
+		    peerList.add(peer.toDoc());
+        }
 		Document doc = new Document();
 		doc.append("peers", peerList);
         doc.append("command","CONNECTION_REFUSED");
@@ -274,13 +269,11 @@ public class Messages {
         return doc1.toJson();
     }
 
-    public static String getListPeersResponse(Map<String, Integer> peers) {
+    public static String getListPeersResponse(List<HostPort> peers) {
         Document doc1 = new Document();
         ArrayList<Document> peerList = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : peers.entrySet()) {
-            String host = entry.getKey();
-            Integer port = entry.getValue();
-            peerList.add(new HostPort(host, port).toDoc());
+        for (HostPort peer : peers) {
+            peerList.add(peer.toDoc());
         }
         doc1.append("command", "LIST_PEERS_RESPONSE");
         doc1.append("peers", peerList);

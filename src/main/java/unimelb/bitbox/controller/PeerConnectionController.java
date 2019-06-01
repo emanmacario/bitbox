@@ -127,12 +127,13 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
      * Returns a map of currently connected peers.
      * @return map
      */
-    public Map<String, Integer> getConnectedPeers() {
-        Map<String, Integer> connectedPeers = new HashMap<>();
+    public List<HostPort> getConnectedPeers() {
+        List<HostPort> connectedPeers = new ArrayList<>();
         for (Peer pc : this.connections) {
             String host = pc.getHost();
             Integer port = pc.getPort();
-            connectedPeers.put(host, port);
+            HostPort hostPort = new HostPort(host, port);
+            connectedPeers.add(hostPort);
         }
         return connectedPeers;
     }

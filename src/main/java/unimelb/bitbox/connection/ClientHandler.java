@@ -1,9 +1,11 @@
 package unimelb.bitbox.connection;
 
-import java.util.Map;
+import unimelb.bitbox.util.HostPort;
+
+import java.util.List;
 
 public interface ClientHandler {
-    Map<String, Integer> listPeers();
+    List<HostPort> listPeers();
     boolean connectPeer(String host, int port);
     boolean disconnectPeer(String host, int port);
 }

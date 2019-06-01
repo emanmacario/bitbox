@@ -30,47 +30,12 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-import unimelb.bitbox.util.Configuration;
-
-
 
 public class Crypto {
 	
 	private static final String PKCS_1_PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----";
 	private static final String PKCS_1_PEM_FOOTER = "-----END RSA PRIVATE KEY-----";
 
-	public Crypto() {
-		
-	}
-	
-	/*TESTING
-	public static void main(String[] args) throws Exception {
-
-		String[] authorizedKeys = Configuration.getConfigurationValue("authorized_keys").split("\\s*,\\s*");
-		sortKeys(authorizedKeys);
-		String identity = "emanmacario@Allan-PC";	
-
-
-
-		PublicKey publicKey = loadPublicKey(identity);
-		String secretKey = loadSecretKey();
-		PrivateKey privateKey = loadPrivateKey("bitboxclient_rsa");
-
-		//Key Pair Test
-		String cipherText = encrypt(secretKey, publicKey);
-		String decipheredMessage = decrypt(cipherText, privateKey);
-
-		//AES Test
-		String msg = "walid";
-		System.out.println(msg);
-		String cipherTextAES = encryptAES(msg, secretKey);
-		System.out.println(cipherTextAES);
-		String decipheredMessageAES = decryptAES(cipherTextAES, secretKey);
-		System.out.println(decipheredMessageAES);
-	}
-*/
-	
-	
 	public static String encryptAES(String msg, String secretKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 		Key aesKey = new SecretKeySpec(secretKey.getBytes(), "AES");
 		Cipher cipher = Cipher.getInstance("AES");

@@ -142,15 +142,6 @@ public class Peer {
             peerConnectionHandlerThread.start();
         }
 
-        Map<String, Integer> peers = peerConnectionHandler.listPeers();
-        log.info("Printing connected peers...");
-        for (Map.Entry<String, Integer> entry : peers.entrySet()) {
-            String host = entry.getKey();
-            int port = entry.getValue();
-            log.info("Connected peer at " + host + ":" + port);
-        }
-
-
         ClientConnectionHandler clientConnectionHandler;
         try {
             clientConnectionHandler = new ClientConnectionHandler(peerConnectionHandler);

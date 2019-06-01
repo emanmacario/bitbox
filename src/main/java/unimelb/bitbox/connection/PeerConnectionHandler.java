@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -172,12 +173,9 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                     byte[] receiveData = new byte[65535];
                     DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                     listeningSocketUDP.receive(receivePacket);
-
                     String clientMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
                     Document clientMessageJSON = Document.parse(clientMessage);
                     String command = clientMessageJSON.getString("command");
-                    Document hostPort = (Document) clientMessageJSON.get("hostPort");
-
 
                     boolean isConnectionCommand = Arrays.asList(CONNECTION_COMMANDS).contains(command);
                     if (isConnectionCommand) {
@@ -189,15 +187,6 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                     } else {
                         controller.processPacket(receivePacket);
                     }
-
-                    //log.info("COMMAND: " + command);
-                    //log.info("hostPort is null: " + (hostPort == null));
-                    //log.info("HOSTPORT: " +  hostPort.toJson());
-
-                    // String host = hostPort.getString("host");
-                    // Integer port = (int) hostPort.getLong("port");
-                    //log.info("Host: " + host);
-                    //log.info("Port: " + port);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -283,7 +272,7 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                     if (controller.isPeerConnected(host, port)) {
                         message = Messages.getInvalidProtocol("peer already connected");
                     } else if (!controller.canAcceptIncomingConnection()) {
-                        Map<String, Integer> connectedPeers = controller.getConnectedPeers();
+                        List<HostPort> connectedPeers = controller.getConnectedPeers();
                         message = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
                     } else {
                         message = Messages.getHandshakeResponse(advertisedHost, this.port);
@@ -315,7 +304,7 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
     }
 
     @Override
-    public Map<String, Integer> listPeers() {
+    public List<HostPort> listPeers() {
         return controller.getConnectedPeers();
     }
 

@@ -7,6 +7,7 @@ import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -15,11 +16,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
-import unimelb.bitbox.util.Configuration;
-import unimelb.bitbox.util.Crypto;
-import unimelb.bitbox.util.Document;
-import unimelb.bitbox.util.Messages;
-
+import unimelb.bitbox.util.*;
 
 
 public class ClientConnectionHandler implements Runnable {
@@ -168,7 +165,7 @@ public class ClientConnectionHandler implements Runnable {
 
 		switch (command) {
 		case "LIST_PEERS_REQUEST":
-			Map<String, Integer> peers = clientHandler.listPeers();
+			List<HostPort> peers = clientHandler.listPeers();
 			response = Messages.getListPeersResponse(peers);
 			encryptedResponse = Crypto.encryptAES(response, secretKey);
 			responsePayload = Messages.getPayload(encryptedResponse);
