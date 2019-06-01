@@ -106,7 +106,6 @@ public class PeerServer implements FileSystemObserver, Runnable {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
                 observer.disconnect(host, port);
                 log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
                 // Terminate the PeerClient thread as well

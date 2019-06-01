@@ -312,4 +312,20 @@ public class Messages {
         doc1.append("payload", encryptedMessage);
         return doc1.toJson();
     }
+
+	public static String getConnectPeer(String host, int port) {
+		Document doc1 = new Document();
+        doc1.append("command", "CONNECT_PEER_REQUEST");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        return doc1.toJson();
+	}
+
+	public static String getDisconnectPeer(String host, int port) {
+		Document doc1 = new Document();
+        doc1.append("command", "DISCONNECT_PEER_REQUEST");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        return doc1.toJson();
+	}
 }

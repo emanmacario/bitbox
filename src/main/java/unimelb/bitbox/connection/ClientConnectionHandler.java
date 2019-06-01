@@ -6,7 +6,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -113,7 +112,8 @@ public class ClientConnectionHandler implements Runnable {
 				
 				if (keysMap.containsKey(identity)) {
 					success = true;
-					PublicKey publicKey = Crypto.loadPublicKey(identity);
+					System.out.println(identity);
+					PublicKey publicKey = Crypto.loadPublicKey(keysMap.get(identity));
 					secretKey = Crypto.loadSecretKey();
 					String encryptedSekretKey = Crypto.encrypt(secretKey, publicKey);
 					String authResponse = Messages.getAuthResponse(encryptedSekretKey, success);
@@ -143,15 +143,17 @@ public class ClientConnectionHandler implements Runnable {
 	
 
 	private void handleJSONClientCommand(Document clientMessageJSON, Socket clientSocket, BufferedWriter out) throws IOException, UnsupportedEncodingException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
-		if (clientMessageJSON.getString("command").equals("payload") ) {
+		
 			String payload = clientMessageJSON.getString("payload");
+			if (payload != null) {
 			String decryptedPayload = Crypto.decryptAES(payload, secretKey);
+			System.out.println(decryptedPayload);
 			Document decryptedPayloadDocument = Document.parse(decryptedPayload);
 			handleJSONpayload(decryptedPayloadDocument, out);
-		}else {
-			log.info("no payload field");
-		}
-
+			}else {
+				log.info("NULL Payload");
+			}
+		
 	}
 	
 	private void handleJSONpayload(Document payload, BufferedWriter out) throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
@@ -162,6 +164,7 @@ public class ClientConnectionHandler implements Runnable {
 		String encryptedResponse;
 		String message;
 		String responsePayload;
+		
 
 		switch (command) {
 		case "LIST_PEERS_REQUEST":
@@ -195,6 +198,7 @@ public class ClientConnectionHandler implements Runnable {
 				message = "connection not active";
 			}
 			response = Messages.getDisconnectPeerResponse(host, port, disconnected, message);
+			log.info("Sending response " + response);
 			encryptedResponse = Crypto.encryptAES(response, secretKey);
 			responsePayload = Messages.getPayload(encryptedResponse);
 			send(responsePayload, out);

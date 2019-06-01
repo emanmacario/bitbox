@@ -45,6 +45,11 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
      * @param port the port number of the peer
      */
     public boolean connect(String host, int port) {
+        // Check if already connected
+        if (controller.isPeerConnected(host, port)) {
+            return false;
+        }
+
         // Standard TCP handshaking
         if (mode.equals("tcp")) {
             try {
@@ -166,9 +171,7 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                 while (true) {
                     byte[] receiveData = new byte[65535];
                     DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
                     listeningSocketUDP.receive(receivePacket);
-
 
                     String clientMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
                     Document clientMessageJSON = Document.parse(clientMessage);

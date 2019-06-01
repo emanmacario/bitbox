@@ -35,7 +35,7 @@ import unimelb.bitbox.util.Configuration;
 
 
 public class Crypto {
-	static HashMap<String,String> keysMap = new HashMap<String,String>();
+	
 	private static final String PKCS_1_PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----";
 	private static final String PKCS_1_PEM_FOOTER = "-----END RSA PRIVATE KEY-----";
 
@@ -104,8 +104,8 @@ public class Crypto {
 		return (RSAPrivateKey) kf.generatePrivate(keyspec);
 	}
 
-	public static PublicKey loadPublicKey(String identity) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		RSAPublicKeySpec decodedKey = decodeOpenSSH(keysMap.get(identity));
+	public static PublicKey loadPublicKey(String publicKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		RSAPublicKeySpec decodedKey = decodeOpenSSH(publicKey);
 		KeyFactory factory = KeyFactory.getInstance("RSA");
 		return factory.generatePublic(decodedKey);
 	}
@@ -163,17 +163,6 @@ public class Crypto {
 		System.arraycopy(byteArray1, 0, bytes, 0, byteArray1.length);
 		System.arraycopy(byteArray2, 0, bytes, byteArray1.length, byteArray2.length);
 		return bytes;
-	}
-
-
-	@SuppressWarnings("unchecked")
-	public static void sortKeys(String[] authorizedKeys)  {
-		for (String singleKey: authorizedKeys) {
-			String[] keyIdentity = singleKey.split(" ");
-			String key = keyIdentity[1];
-			String identity  = keyIdentity[2];
-			keysMap.put(identity, key);
-		}
 	}
 
 	static RSAPublicKeySpec decodeOpenSSH(String fields) {

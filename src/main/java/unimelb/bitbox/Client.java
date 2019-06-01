@@ -62,27 +62,58 @@ public class Client {
 			String server = argsBean.getServer();
 			String identity = argsBean.getIdentity();
 			String peer = argsBean.getPeer();
+			
+			String[] hostPort = server.split(":");
+			String host = hostPort[0];
+			int port = Integer.parseInt(hostPort[1]);
 
+			String[] hostPortPeer = null;
+			String hostPeer = null;
+			Integer portPeer = null;
+			if (peer != null) {
+				hostPortPeer = peer.split(":");
+				hostPeer = hostPortPeer[0];
+				portPeer = Integer.parseInt(hostPortPeer[1]);
+			}
 
+			String encyrptedRequest;
+			String payload;
+			String commandResponse;
+			Document commandResponseJSON;
+			
 			switch (command){
 				case "list_peers":
-					sendAuthRequest(identity, server);
-					String encyrptedRequest = Crypto.encryptAES(Messages.getListPeersRequest(), secretKey);
-					String payload = Messages.getPayload(encyrptedRequest);
+					sendAuthRequest(identity, host, port);
+				    encyrptedRequest = Crypto.encryptAES(Messages.getListPeersRequest(), secretKey);
+				    payload = Messages.getPayload(encyrptedRequest);
 					send(payload);
-					String commandResponse = in.readLine();
-					Document commandResponseJSON = Document.parse(commandResponse);
-					String encryptedPayload = commandResponseJSON.getString(payload);
+				    commandResponse = in.readLine();
+				    commandResponseJSON = Document.parse(commandResponse);
+					String encryptedPayload = commandResponseJSON.getString("payload");
 					String response = Crypto.decryptAES(encryptedPayload, secretKey);
-					System.out.println(response);
+					log.info(response);
 					break;
 				case "connect_peer":
-					sendAuthRequest(identity, server);
-					//send encypted connected peers command
+					sendAuthRequest(identity, host, port);
+				    encyrptedRequest = Crypto.encryptAES(Messages.getConnectPeer(hostPeer,portPeer), secretKey);
+					 payload = Messages.getPayload(encyrptedRequest);
+					send(payload);
+				    commandResponse = in.readLine();
+				    commandResponseJSON = Document.parse(commandResponse);
+				    encryptedPayload = commandResponseJSON.getString("payload");
+				    response = Crypto.decryptAES(encryptedPayload, secretKey);
+					log.info(response);
 					break;
 				case "disconnect_peer":
-					sendAuthRequest(identity, server);
-					//send encypted dsconnect peers command
+					sendAuthRequest(identity, host, port);
+				    encyrptedRequest = Crypto.encryptAES(Messages.getDisconnectPeer(hostPeer,portPeer), secretKey);
+					 payload = Messages.getPayload(encyrptedRequest);
+					send(payload);
+				    commandResponse = in.readLine();
+				    commandResponseJSON = Document.parse(commandResponse);
+				    encryptedPayload = commandResponseJSON.getString("payload");
+				    response = Crypto.decryptAES(encryptedPayload, secretKey);
+				    log.info(response);
 					break;
 				default:
 					System.out.println("invalid command");
@@ -97,12 +128,7 @@ public class Client {
 	}
 
 
-	private static void sendAuthRequest(String identity, String server) throws Exception {
-
-		String[] hostPort = server.split(":");
-		String host = hostPort[0];
-		int port = Integer.parseInt(hostPort[1]);
-
+	private static void sendAuthRequest(String identity, String host, int port) throws Exception {
 		try {
 			// Create client socket, get input and output buffers
 			Socket clientSocket = new Socket(host, port);
@@ -117,11 +143,8 @@ public class Client {
 			log.info("sending to " + host + ":" + "port " + authRequest);
 			String authResponse = in.readLine(); // Blocking receive call
 			Document authResponseJSON = Document.parse(authResponse);
-			log.info("Received response " + authResponseJSON.toJson());
 			String encryptedSecretKey = handleJSONServerMessage(authResponseJSON);
-			log.info("privateKey is null: " + (privateKey == null));
 			secretKey = Crypto.decrypt(encryptedSecretKey, privateKey);
-
 
 		} catch (IOException e) {
 			log.warning("while connecting to " + host + ":" + port + " connection refused");

@@ -15,6 +15,7 @@ import java.net.DatagramSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class Peer {
@@ -140,6 +141,15 @@ public class Peer {
         if (mode.equals("udp")) {
             peerConnectionHandlerThread.start();
         }
+
+        Map<String, Integer> peers = peerConnectionHandler.listPeers();
+        log.info("Printing connected peers...");
+        for (Map.Entry<String, Integer> entry : peers.entrySet()) {
+            String host = entry.getKey();
+            int port = entry.getValue();
+            log.info("Connected peer at " + host + ":" + port);
+        }
+
 
         ClientConnectionHandler clientConnectionHandler;
         try {
