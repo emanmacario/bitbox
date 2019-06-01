@@ -122,11 +122,8 @@ public class Peer {
 
         // Start main I/O connection handler thread
         PeerConnectionHandler peerConnectionHandler = new PeerConnectionHandler(serverPort, advertisedName, mode);
-
         Thread peerConnectionHandlerThread = new Thread(peerConnectionHandler);
-        if (mode.equals("tcp")) {
-            peerConnectionHandlerThread.start();
-        }
+        peerConnectionHandlerThread.start();
 
         // Attempt to connect to peers listed in the configuration file
         String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
@@ -138,10 +135,7 @@ public class Peer {
             peerConnectionHandler.connect(host,port);
         }
 
-        if (mode.equals("udp")) {
-            peerConnectionHandlerThread.start();
-        }
-
+        // Start thread for client operations
         ClientConnectionHandler clientConnectionHandler;
         try {
             clientConnectionHandler = new ClientConnectionHandler(peerConnectionHandler);

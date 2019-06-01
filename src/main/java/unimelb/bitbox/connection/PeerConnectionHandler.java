@@ -12,7 +12,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class PeerConnectionHandler implements Runnable, ClientHandler {
@@ -84,13 +83,8 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                 String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
                 byte[] sendData = handshakeRequest.getBytes();
 
-                // Set infinite receive timeout time
-                listeningSocketUDP.setSoTimeout(2000);
-
-                // Initialise send and receive packets
+                // Initialise send packet
                 DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, port);
-                byte[] receiveData = new byte[65535];
-                DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
                 // Try sending the packet
                 try {
@@ -99,23 +93,7 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                // Try receiving a response
-                try {
-                    listeningSocketUDP.receive(receivePacket);
-                    if (!receivePacket.getAddress().equals(serverAddress)) {
-                        throw new IOException("Received packet from unknown address");
-                    }
-                    String handshakeResponse = new String(receivePacket.getData(), 0, receivePacket.getLength(), StandardCharsets.UTF_8);
-                    Document handshakeResponseJSON = Document.parse(handshakeResponse);
-                    try {
-                        handleJSONServerMessage(handshakeResponseJSON, null, null);
-                    } catch (NoSuchAlgorithmException | IOException e) {
-                        e.printStackTrace();
-                    }
-                } catch (IOException e) {
-                    log.warning("while connecting to " + host + ":" + port + " connection request timed out");
-                }
-            } catch (SocketException | UnknownHostException e) {
+            } catch (UnknownHostException e) {
                 e.printStackTrace();
             }
         }
@@ -179,10 +157,24 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
 
                     boolean isConnectionCommand = Arrays.asList(CONNECTION_COMMANDS).contains(command);
                     if (isConnectionCommand) {
-                        try {
-                            handleJSONClientMessage(clientMessageJSON, null, null);
-                        } catch (NoSuchAlgorithmException e) {
-                            e.printStackTrace();
+                        switch (command) {
+                            case "HANDSHAKE_REQUEST":
+                                try {
+                                    handleJSONClientMessage(clientMessageJSON, null, null);
+                                } catch (NoSuchAlgorithmException e) {
+                                    e.printStackTrace();
+                                }
+                                break;
+                            case "HANDSHAKE_RESPONSE":
+                            case "CONNECTION_REFUSED":
+                                try {
+                                    handleJSONServerMessage(clientMessageJSON, null, null);
+                                } catch (NoSuchAlgorithmException e) {
+                                    e.printStackTrace();
+                                }
+                                break;
+                            default:
+                                break;
                         }
                     } else {
                         controller.processPacket(receivePacket);
@@ -250,8 +242,12 @@ public class PeerConnectionHandler implements Runnable, ClientHandler {
             default:
                 log.warning("received an invalid message from " + host + ":" + port);
                 invalidProtocol = Messages.getInvalidProtocol("expected HANDSHAKE_RESPONSE");
-                send(invalidProtocol, out);
-                log.info("sending to " + host + ":" + port + " " + invalidProtocol);
+                if (mode.equals("tcp")) {
+                    send(invalidProtocol, out);
+                    log.info("sending to " + host + ":" + port + " " + invalidProtocol);
+                } else {
+                    send(invalidProtocol, host, port);
+                }
                 break;
         }
     }
