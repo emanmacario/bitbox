@@ -5,9 +5,11 @@ import unimelb.bitbox.connection.ConnectionObserver;
 import unimelb.bitbox.protocols.PeerClient;
 import unimelb.bitbox.protocols.PeerServer;
 import unimelb.bitbox.util.Configuration;
+import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
+import java.net.DatagramSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -21,7 +23,8 @@ public class Peer {
     private PeerClient client;
     private PeerServer server;
 
-    public Peer(String host, int port, Socket socket, ConnectionObserver observer) throws IOException, NoSuchAlgorithmException {
+    public Peer(String host, int port, Socket socket, ConnectionObserver observer)
+            throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
         this.peerHost = host;
         this.peerPort = port;
@@ -29,6 +32,18 @@ public class Peer {
         this.server = new PeerServer(this.client, host, port, socket, observer);
         this.start();
     }
+
+
+    public Peer(String host, int port, DatagramSocket socket, ConnectionObserver observer)
+            throws IOException, NoSuchAlgorithmException {
+        log.info("Connection to " + host + ":" + port + " established");
+        this.peerHost = host;
+        this.peerPort = port;
+        this.client = new PeerClient(host, port, socket);
+        this.server = new PeerServer(this.client, host, port, socket, observer);
+        this.start();
+    }
+
 
     public void onNewFileSystemEvent(FileSystemEvent event) {
         this.client.enqueue(event);
@@ -38,6 +53,11 @@ public class Peer {
         for (FileSystemEvent event : syncEvents) {
             client.enqueue(event);
         }
+    }
+
+    public void processMessage(Document message) throws NoSuchAlgorithmException, IOException {
+        server.handleIncomingClientMessage(message);
+
     }
 
     /**
@@ -81,6 +101,9 @@ public class Peer {
         // Start main I/O connection handler thread
         ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName, mode);
         Thread connectionHandlerThread = new Thread(connectionHandler);
+        if (mode.equals("tcp")) {
+            connectionHandlerThread.start();
+        }
 
         // Attempt to connect to peers listed in the configuration file
         String[] peersArray = Configuration.getConfigurationValue("peers").split("\\s*,\\s*");
@@ -92,6 +115,8 @@ public class Peer {
             connectionHandler.connect(host,port);
         }
 
-        connectionHandlerThread.start();
+        if (mode.equals("udp")) {
+            connectionHandlerThread.start();
+        }
     }
 }

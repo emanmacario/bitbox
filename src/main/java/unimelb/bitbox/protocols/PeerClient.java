@@ -1,5 +1,6 @@
 package unimelb.bitbox.protocols;
 
+import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.Messages;
@@ -7,6 +8,9 @@ import unimelb.bitbox.util.Messages;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
@@ -21,10 +25,12 @@ public class PeerClient implements Runnable {
     private int port;
     private Queue<FileSystemEvent> events;
     private Queue<String> messages;
+    private DatagramSocket socket;
     private BufferedWriter out;
     private boolean closed;
+    private String mode;
 
-    // PeerClient constructor
+    // TCP PeerClient constructor
     public PeerClient(String host, int port, Socket socket) throws IOException {
         this.host = host;
         this.port = port;
@@ -32,7 +38,21 @@ public class PeerClient implements Runnable {
         this.messages = new LinkedList<>();
         this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.closed = false;
+        this.mode = Configuration.getConfigurationValue("mode");
     }
+
+
+    // UDP PeerClient constructor
+    public PeerClient(String host, int port, DatagramSocket socket) {
+        this.host = host;
+        this.port = port;
+        this.socket = socket;
+        this.events = new LinkedList<>();
+        this.messages = new LinkedList<>();
+        this.closed = false;
+        this.mode = Configuration.getConfigurationValue("mode");
+    }
+
 
     /**
      * Handles an outgoing reply to the client,
@@ -156,8 +176,15 @@ public class PeerClient implements Runnable {
      * @throws IOException
      */
     private void send(String message) throws IOException {
-        out.write(message + '\n');
         log.info("sending to " + host + ":" + port + " " + message);
-        out.flush();
+        if (mode.equals("tcp")) {
+            out.write(message + '\n');
+            out.flush();
+        } else {
+            InetAddress address = InetAddress.getByName(host);
+            byte[] sendData = message.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, port);
+            socket.send(sendPacket);
+        }
     }
 }

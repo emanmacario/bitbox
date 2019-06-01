@@ -5,6 +5,9 @@ import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -22,12 +25,14 @@ public class PeerServer implements FileSystemObserver, Runnable {
     private ConnectionObserver observer;
     private String host;
     private int port;
+    private DatagramSocket socket;
     private BufferedReader in;
     private BufferedWriter out;
     private long blockSize;
+    private String mode;
 
     /**
-     * PeerServer constructor
+     * TCP PeerServer constructor
      * @param client the corresponding peer client thread object
      * @param host the peer host name
      * @param port the peer port number
@@ -46,7 +51,31 @@ public class PeerServer implements FileSystemObserver, Runnable {
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.observer = observer;
-        this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+        this.mode = Configuration.getConfigurationValue("mode");
+        if (this.mode.equals("tcp")) {
+            this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+        } else {
+            this.blockSize = Math.min(Long.parseLong(Configuration.getConfigurationValue("blockSize")), 8192);
+        }
+    }
+
+    // UDP PeerServer constructor
+    public PeerServer(PeerClient client, String host, int port, DatagramSocket socket, ConnectionObserver observer)
+            throws NoSuchAlgorithmException, IOException {
+        if (fileSystemManager == null) {
+            fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
+        }
+        this.client = client;
+        this.host = host;
+        this.port = port;
+        this.socket = socket;
+        this.observer = observer;
+        this.mode = Configuration.getConfigurationValue("mode");
+        if (this.mode.equals("tcp")) {
+            this.blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+        } else {
+            this.blockSize = Math.min(Long.parseLong(Configuration.getConfigurationValue("blockSize")), 8192);
+        }
     }
 
     @Override
@@ -60,29 +89,31 @@ public class PeerServer implements FileSystemObserver, Runnable {
      */
     @Override
     public void run() {
-        // Read any incoming request from the input buffer.
-        // This blocks until an incoming message is received.
-        String clientMessage;
-        try {
-            while ((clientMessage = in.readLine()) != null) {
-                // Parse the request into a JSON object
-                Document clientMessageJSON = Document.parse(clientMessage);
+        if (mode.equals("tcp")) {
+            // Read any incoming request from the input buffer.
+            // This blocks until an incoming message is received.
+            String clientMessage;
+            try {
+                while ((clientMessage = in.readLine()) != null) {
+                    // Parse the request into a JSON object
+                    Document clientMessageJSON = Document.parse(clientMessage);
 
-                // Handle the incoming request
-                try {
-                    handleIncomingClientMessage(clientMessageJSON);
-                } catch (NoSuchAlgorithmException | IOException e) {
-                    e.printStackTrace();
+                    // Handle the incoming request
+                    try {
+                        handleIncomingClientMessage(clientMessageJSON);
+                    } catch (NoSuchAlgorithmException | IOException e) {
+                        e.printStackTrace();
+                    }
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        observer.disconnect(host, port);
-        log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
+            observer.disconnect(host, port);
+            log.info("Connection to " + host + ":" + port + " has been terminated, PeerServer thread has stopped");
 
-        // Terminate the PeerClient thread as well
-        this.client.close();
+            // Terminate the PeerClient thread as well
+            this.client.close();
+        }
     }
 
     /**
@@ -91,7 +122,7 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @throws NoSuchAlgorithmException
      * @throws IOException
      */
-    private void handleIncomingClientMessage(Document clientMessage) throws NoSuchAlgorithmException, IOException {
+    public void handleIncomingClientMessage(Document clientMessage) throws NoSuchAlgorithmException, IOException {
         String command = clientMessage.getString("command");
         String response;
         switch (command) {
@@ -130,6 +161,9 @@ public class PeerServer implements FileSystemObserver, Runnable {
                 break;
             case "FILE_BYTES_RESPONSE":
                 processFileBytesResponse(clientMessage);
+                break;
+            case "INVALID_PROTOCOL":
+                processInvalidProtocol(clientMessage);
                 break;
             default:
                 // Invalid protocol
@@ -468,6 +502,13 @@ public class PeerServer implements FileSystemObserver, Runnable {
         }
     }
 
+    private void processInvalidProtocol(Document response) {
+        String command = response.getString("command");
+        String message = response.getString("message");
+        log.warning("received [" + command + "] from " + host + ":" + port);
+        log.warning(command + " " + message);
+    }
+
     /**
      * Sends a request/response string to the connected peer.
      * Appends a newline char to the outgoing message.
@@ -475,8 +516,17 @@ public class PeerServer implements FileSystemObserver, Runnable {
      * @throws IOException
      */
     private void send(String message) throws IOException {
-        out.write(message + '\n');
         log.info("sending to " + host + ":" + port + " " + message);
-        out.flush();
+        if (mode.equals("tcp")) {
+            out.write(message + '\n');
+            out.flush();
+        } else {
+            InetAddress address = InetAddress.getByName(host);
+            byte[] sendData = message.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, port);
+            socket.send(sendPacket);
+        }
     }
 }
+
+

@@ -10,11 +10,13 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
 
 public class ConnectionHandler implements Runnable {
     private static Logger log = Logger.getLogger(ConnectionHandler.class.getName());
+    private static String[] CONNECTION_COMMANDS = {"HANDSHAKE_REQUEST", "HANDSHAKE_RESPONSE", "CONNECTION_REFUSED"};
 
     private int port;
     private String advertisedHost;
@@ -173,6 +175,7 @@ public class ConnectionHandler implements Runnable {
         // Extension UDP implementation
         else {
             try {
+                // Set no time limit on blocking receive call
                 listeningSocketUDP.setSoTimeout(0);
                 while (true) {
                     byte[] receiveData = new byte[65535];
@@ -180,28 +183,37 @@ public class ConnectionHandler implements Runnable {
 
                     listeningSocketUDP.receive(receivePacket);
 
+
                     String clientMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
                     Document clientMessageJSON = Document.parse(clientMessage);
                     String command = clientMessageJSON.getString("command");
                     Document hostPort = (Document) clientMessageJSON.get("hostPort");
 
+
+                    boolean isConnectionCommand = Arrays.stream(CONNECTION_COMMANDS).anyMatch(command :: equals);
+                    if (isConnectionCommand) {
+                        try {
+                            handleJSONClientMessage(clientMessageJSON, null, null);
+                        } catch (NoSuchAlgorithmException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        controller.processPacket(receivePacket);
+                    }
+
                     //log.info("COMMAND: " + command);
                     //log.info("hostPort is null: " + (hostPort == null));
                     //log.info("HOSTPORT: " +  hostPort.toJson());
 
-                    String host = hostPort.getString("host");
-                    Integer port = (int) hostPort.getLong("port");
+                    // String host = hostPort.getString("host");
+                    // Integer port = (int) hostPort.getLong("port");
                     //log.info("Host: " + host);
                     //log.info("Port: " + port);
 
 
 
 
-                    try {
-                        handleJSONClientMessage(clientMessageJSON, null, null);
-                    } catch (NoSuchAlgorithmException e) {
-                        e.printStackTrace();
-                    }
+
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -237,12 +249,14 @@ public class ConnectionHandler implements Runnable {
                         }
                     } else {
                         // Start threads for the outgoing connection
-                        // controller.addOutgoingConnection(host, port, socket);
-                        log.info("CONNECTION ESTABLISHED TO " + host + ":" + port);
+                        if (mode.equals("tcp")) {
+                            controller.addOutgoingConnection(host, port, socket);
+                        } else {
+                            controller.addOutgoingConnection(host, port, listeningSocketUDP);
+                        }
                     }
                 }
                 break;
-
             case "CONNECTION_REFUSED":
                 log.info("received command [" + command + "] from " + host + ":" + port);
                 ArrayList<Document> peers = (ArrayList<Document>) json.get("peers");
@@ -256,6 +270,9 @@ public class ConnectionHandler implements Runnable {
                         }
                     }
                 }
+                break;
+            case "INVALID_PROTOCOL":
+                log.warning("received command [" + command + "] from " + host + ":" + port);
                 break;
             default:
                 log.warning("received an invalid message from " + host + ":" + port);
@@ -286,8 +303,11 @@ public class ConnectionHandler implements Runnable {
                         message = Messages.getConnectionRefused(connectedPeers, "connection limit reached");
                     } else {
                         message = Messages.getHandshakeResponse(advertisedHost, this.port);
-                        // controller.addIncomingConnection(host, port, clientSocket);
-                        log.info("CONNECTION ESTABLISHED TO " + host + ":" + port);
+                        if (mode.equals("tcp")) {
+                            controller.addIncomingConnection(host, port, clientSocket);
+                        } else {
+                            controller.addIncomingConnection(host, port, listeningSocketUDP);
+                        }
                     }
                     if (mode.equals("tcp")) {
                         send(message, out);
@@ -306,6 +326,7 @@ public class ConnectionHandler implements Runnable {
                 } else {
                     send(message, host, port);
                 }
+                break;
         }
     }
 
@@ -328,12 +349,11 @@ public class ConnectionHandler implements Runnable {
      */
     private void send(String message, String host, int port) {
         try {
-            DatagramSocket socket = new DatagramSocket();
             InetAddress address = InetAddress.getByName(host);
             byte[] sendData = message.getBytes();
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, port);
             log.info("sending to " + host + ":" + port + " " + message);
-            socket.send(sendPacket);
+            listeningSocketUDP.send(sendPacket);
         } catch (IOException e) {
             e.printStackTrace();
         }
