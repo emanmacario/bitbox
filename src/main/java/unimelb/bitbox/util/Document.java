@@ -94,8 +94,10 @@ public class Document {
 			JSONObject obj  = (JSONObject) parser.parse(json);
 			return new Document(obj);
 		} catch (ParseException e) {
+			e.printStackTrace();
 			return new Document();
 		} catch (ClassCastException e){
+			e.printStackTrace();
 			return new Document();
 		}
 	}

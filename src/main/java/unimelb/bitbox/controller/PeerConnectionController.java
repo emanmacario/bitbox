@@ -2,14 +2,15 @@ package unimelb.bitbox.controller;
 
 import unimelb.bitbox.Peer;
 import unimelb.bitbox.connection.ConnectionObserver;
-import unimelb.bitbox.util.Configuration;
-import unimelb.bitbox.util.FileSystemManager;
+import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
-import unimelb.bitbox.util.FileSystemObserver;
-import unimelb.bitbox.util.HostPort;
 
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.logging.Logger;
@@ -25,6 +26,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     private int syncInterval;
     private int maximumIncomingConnections;
     private int currentIncomingConnections;
+    private String mode;
 
     public PeerConnectionController() throws NoSuchAlgorithmException, IOException {
         this.fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"),this);
@@ -32,11 +34,39 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
         this.incomingConnections = new ArrayList<>();
         this.syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval"));
         this.maximumIncomingConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
+        this.mode = Configuration.getConfigurationValue("mode");
         this.currentIncomingConnections = 0;
         this.start();
     }
 
+    public void processPacket(DatagramPacket packet) {
+        // Extract information from the packet
+        String message = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+        InetAddress address = packet.getAddress();
+        String host = address.getHostName();
+        int port = packet.getPort();
+
+        // Delegate processing to the peer the packet belongs to
+        for (Peer peer : connections) {
+            String peerHost = peer.getHost();
+            int peerPort = peer.getPort();
+            if (host.equals(peerHost) && (port == peerPort)) {
+                try {
+                    peer.processMessage(Document.parse(message));
+                } catch (NoSuchAlgorithmException | IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     public void addIncomingConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket);
+        this.incomingConnections.add(new HostPort(host, port));
+        this.currentIncomingConnections += 1;
+    }
+
+    public void addIncomingConnection(String host, int port, DatagramSocket socket) throws IOException, NoSuchAlgorithmException {
         addConnection(host, port, socket);
         this.incomingConnections.add(new HostPort(host, port));
         this.currentIncomingConnections += 1;
@@ -46,10 +76,20 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
         addConnection(host, port, socket);
     }
 
-    private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
-        Peer connection = new Peer(host, port, socket, this);
-        this.connections.add(connection);
+    public void addOutgoingConnection(String host, int port, DatagramSocket socket) throws IOException, NoSuchAlgorithmException {
+        addConnection(host, port, socket);
     }
+
+    private void addConnection(String host, int port, Socket socket) throws IOException, NoSuchAlgorithmException {
+        Peer peer = new Peer(host, port, socket, this);
+        this.connections.add(peer);
+    }
+
+    private void addConnection(String host, int port, DatagramSocket socket) throws IOException, NoSuchAlgorithmException {
+        Peer peer = new Peer(host, port, socket, this);
+        this.connections.add(peer);
+    }
+
 
     @Override
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
@@ -87,14 +127,25 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
      * Returns a map of currently connected peers.
      * @return map
      */
-    public Map<String, Integer> getConnectedPeers() {
-        Map<String, Integer> connectedPeers = new HashMap<>();
+    public List<HostPort> getConnectedPeers() {
+        List<HostPort> connectedPeers = new ArrayList<>();
         for (Peer pc : this.connections) {
             String host = pc.getHost();
             Integer port = pc.getPort();
-            connectedPeers.put(host, port);
+            HostPort hostPort = new HostPort(host, port);
+            connectedPeers.add(hostPort);
         }
         return connectedPeers;
+    }
+
+    public boolean disconnectPeer(String host, int port) {
+        for (Peer peer : connections) {
+            if (peer.getHost().equals(host) && (peer.getPort() == port)) {
+                peer.disconnect();
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -108,7 +159,7 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
             public void run() {
                 relaySyncEvents();
             }
-        }, 0,syncInterval * 1000);
+        }, 0, syncInterval * 1000);
     }
 
     /**
@@ -137,23 +188,24 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     @Override
     public void disconnect(String host, int port) {
         // Update current peers connections list
-        List<Peer> disconnections = new ArrayList<>();
+        Peer disconnect = null;
         for (Peer pc : connections) {
             if (host.equals(pc.getHost()) && port == pc.getPort()) {
-                disconnections.add(pc);
+                disconnect = pc;
             }
         }
-        connections.removeAll(disconnections);
+        connections.remove(disconnect);
+        log.info("disconnected from " + host + ":" + port);
 
         // Update maximum incoming connections if-and-only-if the
         // connection for the peer that disconnected was incoming
-        List<HostPort> incomingDisconnections = new ArrayList<>();
+        HostPort incomingDisconnect = null;
         for (HostPort hp : incomingConnections) {
             if (host.equals(hp.host) && port == hp.port) {
-                incomingDisconnections.add(hp);
+                incomingDisconnect = hp;
                 currentIncomingConnections -= 1;
             }
         }
-        incomingConnections.removeAll(incomingDisconnections);
+        incomingConnections.remove(incomingDisconnect);
     }
 }
