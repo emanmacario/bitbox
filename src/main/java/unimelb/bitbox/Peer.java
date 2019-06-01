@@ -1,6 +1,8 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.connection.ConnectionHandler;
+import unimelb.bitbox.connection.ClientConnectionHandler;
+import unimelb.bitbox.connection.ClientHandler;
+import unimelb.bitbox.connection.PeerConnectionHandler;
 import unimelb.bitbox.connection.ConnectionObserver;
 import unimelb.bitbox.protocols.PeerClient;
 import unimelb.bitbox.protocols.PeerServer;
@@ -20,20 +22,25 @@ public class Peer {
 
     private String peerHost;
     private Integer peerPort;
+    private Socket socket;
     private PeerClient client;
     private PeerServer server;
+    private ConnectionObserver observer;
 
+    // TCP Peer constructor
     public Peer(String host, int port, Socket socket, ConnectionObserver observer)
             throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
+        this.observer = observer;
         this.peerHost = host;
         this.peerPort = port;
+        this.socket = socket;
         this.client = new PeerClient(host, port, socket);
         this.server = new PeerServer(this.client, host, port, socket, observer);
         this.start();
     }
 
-
+    // UDP Peer constructor
     public Peer(String host, int port, DatagramSocket socket, ConnectionObserver observer)
             throws IOException, NoSuchAlgorithmException {
         log.info("Connection to " + host + ":" + port + " established");
@@ -43,7 +50,6 @@ public class Peer {
         this.server = new PeerServer(this.client, host, port, socket, observer);
         this.start();
     }
-
 
     public void onNewFileSystemEvent(FileSystemEvent event) {
         this.client.enqueue(event);
@@ -72,6 +78,20 @@ public class Peer {
         log.info("PeerServer thread for " + peerHost + ":" + peerPort + " started");
     }
 
+    public void disconnect() {
+        String mode = Configuration.getConfigurationValue("mode");
+        if (mode.equals("tcp")) {
+            try {
+                this.socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            client.close();
+            observer.disconnect(peerHost, peerPort);
+        }
+    }
+
     public String getHost() {
         return this.peerHost;
     }
@@ -79,6 +99,7 @@ public class Peer {
     public int getPort() {
         return this.peerPort;
     }
+
 
     public static void main( String[] args ) throws IOException, NumberFormatException, NoSuchAlgorithmException, InterruptedException
     {
@@ -99,10 +120,11 @@ public class Peer {
         }
 
         // Start main I/O connection handler thread
-        ConnectionHandler connectionHandler = new ConnectionHandler(serverPort, advertisedName, mode);
-        Thread connectionHandlerThread = new Thread(connectionHandler);
+        PeerConnectionHandler peerConnectionHandler = new PeerConnectionHandler(serverPort, advertisedName, mode);
+
+        Thread peerConnectionHandlerThread = new Thread(peerConnectionHandler);
         if (mode.equals("tcp")) {
-            connectionHandlerThread.start();
+            peerConnectionHandlerThread.start();
         }
 
         // Attempt to connect to peers listed in the configuration file
@@ -112,11 +134,20 @@ public class Peer {
             String host = peerHostPort[0];
             int port = Integer.parseInt(peerHostPort[1]);
             log.info("attempting to connect to " + host + ":" + port);
-            connectionHandler.connect(host,port);
+            peerConnectionHandler.connect(host,port);
         }
 
         if (mode.equals("udp")) {
-            connectionHandlerThread.start();
+            peerConnectionHandlerThread.start();
+        }
+
+        ClientConnectionHandler clientConnectionHandler;
+        try {
+            clientConnectionHandler = new ClientConnectionHandler(peerConnectionHandler);
+            Thread clientConnectionHandlerThread = new Thread(clientConnectionHandler);
+            clientConnectionHandlerThread.start();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

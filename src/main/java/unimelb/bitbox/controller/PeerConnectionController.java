@@ -137,6 +137,16 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
         return connectedPeers;
     }
 
+    public boolean disconnectPeer(String host, int port) {
+        for (Peer peer : connections) {
+            if (peer.getHost().equals(host) && (peer.getPort() == port)) {
+                peer.disconnect();
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Start running the PeerConnectionController thread
      */
@@ -177,23 +187,24 @@ public class PeerConnectionController implements FileSystemObserver, ConnectionO
     @Override
     public void disconnect(String host, int port) {
         // Update current peers connections list
-        List<Peer> disconnections = new ArrayList<>();
+        Peer disconnect = null;
         for (Peer pc : connections) {
             if (host.equals(pc.getHost()) && port == pc.getPort()) {
-                disconnections.add(pc);
+                disconnect = pc;
             }
         }
-        connections.removeAll(disconnections);
+        connections.remove(disconnect);
+        log.info("disconnected from " + host + ":" + port);
 
         // Update maximum incoming connections if-and-only-if the
         // connection for the peer that disconnected was incoming
-        List<HostPort> incomingDisconnections = new ArrayList<>();
+        HostPort incomingDisconnect = null;
         for (HostPort hp : incomingConnections) {
             if (host.equals(hp.host) && port == hp.port) {
-                incomingDisconnections.add(hp);
+                incomingDisconnect = hp;
                 currentIncomingConnections -= 1;
             }
         }
-        incomingConnections.removeAll(incomingDisconnections);
+        incomingConnections.remove(incomingDisconnect);
     }
 }

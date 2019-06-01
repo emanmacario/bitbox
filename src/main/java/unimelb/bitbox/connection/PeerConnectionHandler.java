@@ -14,8 +14,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
 
-public class ConnectionHandler implements Runnable {
-    private static Logger log = Logger.getLogger(ConnectionHandler.class.getName());
+public class PeerConnectionHandler implements Runnable, ClientHandler {
+    private static Logger log = Logger.getLogger(PeerConnectionHandler.class.getName());
     private static String[] CONNECTION_COMMANDS = {"HANDSHAKE_REQUEST", "HANDSHAKE_RESPONSE", "CONNECTION_REFUSED"};
 
     private int port;
@@ -25,7 +25,7 @@ public class ConnectionHandler implements Runnable {
     private DatagramSocket listeningSocketUDP;
     private PeerConnectionController controller;
 
-    public ConnectionHandler(int port, String advertisedHost, String mode) throws IOException, NoSuchAlgorithmException {
+    public PeerConnectionHandler(int port, String advertisedHost, String mode) throws IOException, NoSuchAlgorithmException {
         this.port = port;
         this.advertisedHost = advertisedHost;
         this.mode = mode;
@@ -44,7 +44,7 @@ public class ConnectionHandler implements Runnable {
      * @param host the host name of the peer
      * @param port the port number of the peer
      */
-    public void connect(String host, int port) {
+    public boolean connect(String host, int port) {
         // Standard TCP handshaking
         if (mode.equals("tcp")) {
             try {
@@ -72,63 +72,49 @@ public class ConnectionHandler implements Runnable {
         }
         // UDP handshaking
         else {
-            // Retransmission parameters
-            int MAX_TRIES = 5;
-            int TIMEOUT = 1000;
-
             try {
                 // Client socket does not need an IP address and port number
-                DatagramSocket clientSocketUDP = new DatagramSocket();
                 InetAddress serverAddress = InetAddress.getByName(host);
                 String handshakeRequest = Messages.getHandshakeRequest(host, this.port);
                 byte[] sendData = handshakeRequest.getBytes();
 
-                // Maximum receive blocking time (milliseconds)
-                listeningSocketUDP .setSoTimeout(TIMEOUT);
-                log.info("Client Socket UDP Port: " + clientSocketUDP.getPort());
+                // Set infinite receive timeout time
+                listeningSocketUDP.setSoTimeout(2000);
 
                 // Initialise send and receive packets
                 DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, port);
                 byte[] receiveData = new byte[65535];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
-                int tries = 0;
-                boolean receivedResponse = false;
-                do {
-                    // Try sending the packet
+                // Try sending the packet
+                try {
+                    listeningSocketUDP.send(sendPacket);
+                    log.info("sending to " + host + ":" + "port " + handshakeRequest);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                // Try receiving a response
+                try {
+                    listeningSocketUDP.receive(receivePacket);
+                    if (!receivePacket.getAddress().equals(serverAddress)) {
+                        throw new IOException("Received packet from unknown address");
+                    }
+                    String handshakeResponse = new String(receivePacket.getData(), 0, receivePacket.getLength(), StandardCharsets.UTF_8);
+                    Document handshakeResponseJSON = Document.parse(handshakeResponse);
                     try {
-                        listeningSocketUDP.send(sendPacket);
-                        log.info("sending to " + host + ":" + "port " + handshakeRequest);
-                    } catch (IOException e) {
+                        handleJSONServerMessage(handshakeResponseJSON, null, null);
+                    } catch (NoSuchAlgorithmException | IOException e) {
                         e.printStackTrace();
                     }
-                    // Try receiving a response
-                    try {
-                        listeningSocketUDP.receive(receivePacket);
-                        if (!receivePacket.getAddress().equals(serverAddress)) {
-                            throw new IOException("Received packet from unknown address");
-                        }
-                        receivedResponse = true;
-                        String handshakeResponse = new String(receivePacket.getData(), 0, receivePacket.getLength(), StandardCharsets.UTF_8);
-                        Document handshakeResponseJSON = Document.parse(handshakeResponse);
-                        try {
-                            handleJSONServerMessage(handshakeResponseJSON, null, null);
-                        } catch (NoSuchAlgorithmException e) {
-                            e.printStackTrace();
-                        }
-
-                    } catch (InterruptedIOException e) {
-                        tries += 1;
-                        log.warning("[ HANDSHAKE REQUEST ] timed out, " + (MAX_TRIES - tries) + " tries remaining...");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                } while ((!receivedResponse) && (tries < MAX_TRIES));
-
+                } catch (IOException e) {
+                    log.warning("while connecting to " + host + ":" + port + " connection request timed out");
+                }
             } catch (SocketException | UnknownHostException e) {
                 e.printStackTrace();
             }
         }
+        // Signify whether connection attempt was successful
+        return controller.isPeerConnected(host, port);
     }
 
     @Override
@@ -190,7 +176,7 @@ public class ConnectionHandler implements Runnable {
                     Document hostPort = (Document) clientMessageJSON.get("hostPort");
 
 
-                    boolean isConnectionCommand = Arrays.stream(CONNECTION_COMMANDS).anyMatch(command :: equals);
+                    boolean isConnectionCommand = Arrays.asList(CONNECTION_COMMANDS).contains(command);
                     if (isConnectionCommand) {
                         try {
                             handleJSONClientMessage(clientMessageJSON, null, null);
@@ -209,11 +195,6 @@ public class ConnectionHandler implements Runnable {
                     // Integer port = (int) hostPort.getLong("port");
                     //log.info("Host: " + host);
                     //log.info("Port: " + port);
-
-
-
-
-
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -328,6 +309,21 @@ public class ConnectionHandler implements Runnable {
                 }
                 break;
         }
+    }
+
+    @Override
+    public Map<String, Integer> listPeers() {
+        return controller.getConnectedPeers();
+    }
+
+    @Override
+    public boolean connectPeer(String host, int port) {
+        return connect(host, port);
+    }
+
+    @Override
+    public boolean disconnectPeer(String host, int port) {
+        return controller.disconnectPeer(host, port);
     }
 
     /**

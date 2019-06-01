@@ -1,6 +1,7 @@
 package unimelb.bitbox.util;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 
@@ -53,7 +54,7 @@ public class Messages {
 		    peerList.add(new HostPort(host, port).toDoc());
 		}
 
-		System.out.println("Size of peerlist:" + peerList.size());
+		//System.out.println("Size of peerlist:" + peerList.size());
 	    
 		Document doc = new Document();
 		doc.append("peers", peerList);
@@ -220,5 +221,95 @@ public class Messages {
         
         return doc1.toJson();
 	}
-	
+
+	public static String getAuthResponse(String EncyptedSecretKey , boolean status) {
+		Document doc1 = new Document();
+        doc1.append("command","AUTH_RESPONSE");
+        doc1.append("AES128",EncyptedSecretKey);
+        doc1.append("status",status);
+        doc1.append("message","public key found");
+       
+
+        return doc1.toJson();
+	}
+
+	public static String getAuthResponse(boolean status, String message) {
+		Document doc1 = new Document();
+        doc1.append("command","AUTH_RESPONSE");
+        doc1.append("status",status);
+        doc1.append("message",message);
+       
+
+        return doc1.toJson();
+	}
+
+	public static String getAuthRequest(String identity) {
+		Document doc1 = new Document();
+        doc1.append("command","AUTH_REQUEST");
+        doc1.append("identity",identity);     
+
+        return doc1.toJson();
+		
+	}
+
+    public static String getListPeersRequest() {
+        Document doc1 = new Document();
+        doc1.append("command", "LIST_PEERS_REQUEST");
+        return doc1.toJson();
+    }
+
+    public static String getConnectPeerRequest(String host, int port) {
+        Document doc1 = new Document();
+        doc1.append("command", "CONNECT_PEER_REQUEST");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        return doc1.toJson();
+    }
+
+    public static String getDisconnectPeerRequest(String host, int port) {
+        Document doc1 = new Document();
+        doc1.append("command", "DISCONNECT_PEER_REQUEST");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        return doc1.toJson();
+    }
+
+    public static String getListPeersResponse(Map<String, Integer> peers) {
+        Document doc1 = new Document();
+        ArrayList<Document> peerList = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : peers.entrySet()) {
+            String host = entry.getKey();
+            Integer port = entry.getValue();
+            peerList.add(new HostPort(host, port).toDoc());
+        }
+        doc1.append("command", "LIST_PEERS_RESPONSE");
+        doc1.append("peers", peerList);
+        return doc1.toJson();
+    }
+
+    public static String getConnectPeerResponse(String host, int port, boolean status, String message) {
+        Document doc1 = new Document();
+        doc1.append("command", "CONNECT_PEER_RESPONSE");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        doc1.append("status", status);
+        doc1.append("message", message);
+        return doc1.toJson();
+    }
+
+    public static String getDisconnectPeerResponse(String host, int port, boolean status, String message) {
+        Document doc1 = new Document();
+        doc1.append("command", "DISCONNECT_PEER_RESPONSE");
+        doc1.append("host", host);
+        doc1.append("port", port);
+        doc1.append("status", status);
+        doc1.append("message", message);
+        return doc1.toJson();
+    }
+
+    public static String getPayload(String encryptedMessage) {
+        Document doc1 = new Document();
+        doc1.append("payload", encryptedMessage);
+        return doc1.toJson();
+    }
 }
